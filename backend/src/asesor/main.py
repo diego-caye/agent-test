@@ -7,7 +7,7 @@ from google.adk.models.base_llm import BaseLlm
 from google.adk.sessions import BaseSessionService, DatabaseSessionService
 
 from asesor.api.errors import register_error_handlers
-from asesor.api.routers import chat, health, sessions
+from asesor.api.routers import chat, handoffs, health, sessions
 from asesor.config import Settings, get_settings
 from asesor.infrastructure.container import build_container, close_container
 from asesor.infrastructure.telemetry import setup_telemetry
@@ -52,5 +52,6 @@ def create_app(
     app.include_router(health.router)
     app.include_router(sessions.router)
     app.include_router(chat.router)
+    app.include_router(handoffs.router)
 
     return app

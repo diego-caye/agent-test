@@ -1,5 +1,6 @@
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -41,6 +42,30 @@ class LeadResponse(BaseModel):
 class ChatRequest(BaseModel):
     session_id: str
     message: str = Field(min_length=1, max_length=2000)
+
+
+class ConfirmationRequest(BaseModel):
+    session_id: str
+    confirmation_id: str
+    approved: bool
+    comment: str | None = Field(default=None, max_length=500)
+
+
+class HandoffDto(BaseModel):
+    id: int
+    ticket: str
+    session_id: str
+    user_id: UUID
+    motivo: str
+    resumen_requerimiento: str
+    canal_preferido: str | None = None
+    urgencia: str | None = None
+    status: str
+    created_at: datetime
+
+
+class UpdateHandoffRequest(BaseModel):
+    status: Literal["IN_PROGRESS", "CLOSED"]
 
 
 class HealthResponse(BaseModel):
