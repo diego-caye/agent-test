@@ -9,6 +9,8 @@ from google.adk.tools.tool_confirmation import ToolConfirmation
 from google.genai import types
 
 from asesor.agent.factory import APP_NAME
+from asesor.agent.guardrails.faults import FAULT_STATE_KEY, Fault
+from asesor.infrastructure.fault_context import use_fault
 
 CONFIRMATION_CALL_NAME = "adk_request_confirmation"
 
@@ -42,9 +44,11 @@ class ChatService:
             raise SessionNotFoundError(session_id)
         return session
 
-    async def run_turn(self, user_id: UUID, session_id: str, message: str) -> AsyncIterator[Event]:
+    async def run_turn(
+        self, user_id: UUID, session_id: str, message: str, fault: Fault | None = None
+    ) -> AsyncIterator[Event]:
         content = types.Content(role="user", parts=[types.Part.from_text(text=message)])
-        async for event in self._run(user_id, session_id, content):
+        async for event in self._run(user_id, session_id, content, fault):
             yield event
 
     async def resume_with_confirmation(
@@ -67,14 +71,20 @@ class ChatService:
             yield event
 
     async def _run(
-        self, user_id: UUID, session_id: str, content: types.Content
+        self,
+        user_id: UUID,
+        session_id: str,
+        content: types.Content,
+        fault: Fault | None = None,
     ) -> AsyncIterator[Event]:
         await self.get_session(user_id, session_id)
 
-        async for event in self._runner.run_async(
-            user_id=str(user_id),
-            session_id=session_id,
-            new_message=content,
-            run_config=RunConfig(streaming_mode=StreamingMode.SSE),
-        ):
-            yield event
+        with use_fault(fault):
+            async for event in self._runner.run_async(
+                user_id=str(user_id),
+                session_id=session_id,
+                new_message=content,
+                state_delta={FAULT_STATE_KEY: fault.value} if fault else None,
+                run_config=RunConfig(streaming_mode=StreamingMode.SSE),
+            ):
+                yield event
