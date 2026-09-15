@@ -6,7 +6,7 @@
 - `session_id`: creado por `POST /api/v1/sessions`, asociado al `user_id` que lo creó. Toda operación sobre una sesión (`GET messages`, `GET lead`, `chat/stream`, `chat/confirmations`) valida `session.user_id == X-User-Id` → 404 si no coincide (nunca 403, para no confirmar existencia a otro usuario).
 - Memoria de conversación: `DatabaseSessionService` de ADK sobre PostgreSQL (`postgresql+asyncpg://`). Alembic y `scripts/ingest_kb.py` usan un DSN síncrono aparte (gotcha #2 de la sección 19 del prompt maestro) — mismo host/DB, driver distinto.
 - Etapa del diálogo y banderas (`solo_mirando`, `etapa_previa`) viven en el estado de sesión ADK (session state), no en una tabla nueva.
-- Datos del lead (`leads`): persistidos **por usuario**, no por sesión — usan el prefijo de scope de usuario que exponga `DatabaseSessionService` en ADK 2.x (se verifica el prefijo exacto contra el paquete instalado en F2, `specs/notes/adk-api.md`). Así, un usuario que abre una sesión nueva es saludado por su nombre sin repetir el descubrimiento (AT correspondiente en spec 09).
+- Datos del lead: persistidos **por usuario** en la tabla `leads` (PK `user_id`), no por sesión. **Decisión de F2:** la tabla es la única fuente de verdad y el proveedor de instrucción la consulta en cada turno; el lead **no** se duplica en el estado con prefijo `user:` de ADK, para no tener dos copias que se puedan desincronizar. El prefijo `user:` existe y está verificado (`specs/notes/adk-api.md` §4) y queda disponible si alguna bandera necesita alcance de usuario. Así, quien abre una sesión nueva es saludado por su nombre sin repetir el descubrimiento (AT-02).
 
 ## 2. Control de tamaño del historial
 

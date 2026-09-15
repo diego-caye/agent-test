@@ -44,16 +44,24 @@ Verificado el 2026-09-15: `ruff check` + `ruff format --check` limpios, `mypy --
 
 ## F2 · `feature/agent-core` · P0
 
-DoD: AT de saludo, lead, anti-loop y concurrencia (spec 09: AT-01, AT-02, AT-03, AT-19).
+DoD: AT de saludo, lead, anti-loop y concurrencia (spec 09: AT-01, AT-02, AT-03, AT-19). **Cumplido.**
 
-- [ ] `specs/notes/adk-api.md` con firmas verificadas
-- [ ] `LlmProvider` factory (Gemini)
-- [ ] Agente "Luis" + instrucción por template
-- [ ] Tool `guardar_lead`
-- [ ] Máquina de estados (`domain/`)
-- [ ] `DatabaseSessionService` sobre Postgres
-- [ ] SSE de `chat/stream`
-- [ ] Telemetría base (trace_id, spans mínimos)
+- [x] `specs/notes/adk-api.md` con firmas verificadas contra `google-adk==2.9.1`
+- [x] Agente "Luis" con instrucción dinámica (callable, no template de `{state_key}`)
+- [x] Tool `guardar_lead` con validación Pydantic e ids desde `ToolContext`
+- [x] Máquina de estados pura en `domain/`
+- [x] `DatabaseSessionService` sobre Postgres + tabla `leads` con Alembic
+- [x] SSE de `chat/stream` con el contrato de spec 02
+- [x] Endpoints de sesiones (`POST`/`GET`, messages, lead)
+- [x] Telemetría base (OTel → Langfuse, no-op sin keys; `trace_id`, latencia, tokens)
+- [x] `FakeAdkLlm` (reemplaza al `FakeLlm` provisional de F1, ya como `BaseLlm` real)
+- [x] Postgres en el CI para los tests de integración y aceptación
+
+Verificado el 2026-09-15: 52 tests en verde (AT-01, AT-02, AT-03, AT-19 incluidos), mypy strict limpio en 54 archivos, ruff limpio, y la app real en Docker crea sesiones, sirve `/lead`, devuelve 404 ante sesión ajena y degrada con gracia cuando el modelo falla.
+
+Pendiente para fases siguientes: la tool `guardar_lead` expone sus parámetros como opcionales (desviación deliberada de la guía "sin defaults" de ADK, porque el upsert es parcial por diseño). `EventsCompactionConfig` está activo pero sus umbrales no se han afinado con conversaciones largas (F7).
+
+Nota: no hay `LlmProvider` factory todavía — el modelo se pasa como string de env directo a `Agent(model=...)`, que es lo que ADK acepta. La factory con adaptadores aparece en F8, cuando Ollama entre en juego (requiere el extra `google-adk[extensions]`).
 
 ## F3 · `feature/hitl` · P0
 

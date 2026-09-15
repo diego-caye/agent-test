@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help install up down logs ps lint fmt typecheck test build ci clean
+.PHONY: help install up down logs ps lint fmt typecheck test build ci clean migrate
 
 BACKEND := backend
 FRONTEND := frontend
@@ -8,6 +8,7 @@ help:
 	@echo "install    instala dependencias de backend (uv) y frontend (npm)"
 	@echo "up         levanta db + backend + frontend con Docker"
 	@echo "down       apaga los servicios"
+	@echo "migrate    aplica las migraciones de Alembic"
 	@echo "logs       sigue los logs de los servicios"
 	@echo "lint       ruff check + ruff format --check"
 	@echo "fmt        aplica ruff format"
@@ -31,6 +32,9 @@ logs:
 
 ps:
 	docker compose ps
+
+migrate:
+	cd $(BACKEND) && uv run alembic upgrade head
 
 lint:
 	cd $(BACKEND) && uv run ruff check .

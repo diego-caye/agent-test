@@ -21,6 +21,8 @@ stateDiagram-v2
 
 Solo avanza, salvo la cancelación de `DERIVACION_PENDIENTE`, que vuelve a la etapa previa exacta (se guarda `etapa_previa` al entrar a `DERIVACION_PENDIENTE`). No hay retroceso desde `DERIVADO`.
 
+**Monotonía (aclarado en F2).** La máquina es monótona: recalcula la etapa derivada del lead y se queda con la mayor entre esa y la actual. Eso significa que puede **saltarse `DESCUBRIMIENTO`** si el usuario da uso y tipo de vehículo antes que su nombre — pasa de `NUEVO` directo a `INTERES_CONCRETO`. Es intencional: bloquear el salto dejaría el diálogo trabado en una etapa que ya no describe la conversación.
+
 ## 2. Tabla de transiciones
 
 | # | Transición | Trigger | Guard | Acción | Tool | Evento SSE |

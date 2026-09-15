@@ -26,3 +26,9 @@ Thumbs.db
 
 .idea/
 .vscode/
+
+# Skills de agentes instalados localmente (npx skills add google/agents-cli)
+.agents/
+.claude/skills/
+skills-lock.json
+
