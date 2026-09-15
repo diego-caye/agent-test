@@ -10,8 +10,10 @@ from google.adk.models.base_llm import BaseLlm
 from asesor.agent.instruction import render_instruction
 from asesor.agent.state import read_dialog_state
 from asesor.agent.tools.handoff_tools import make_solicitar_contacto_humano
+from asesor.agent.tools.knowledge_tools import make_search_knowledge_base
 from asesor.agent.tools.lead_tools import make_guardar_lead
 from asesor.application.handoff_service import HandoffService
+from asesor.application.knowledge_service import KnowledgeService
 from asesor.application.lead_service import LeadService
 from asesor.config import Settings
 
@@ -23,6 +25,7 @@ def create_agent(
     settings: Settings,
     lead_service: LeadService,
     handoff_service: HandoffService,
+    knowledge_service: KnowledgeService,
     model: str | BaseLlm | None = None,
 ) -> Agent:
     async def instruction_provider(ctx: ReadonlyContext) -> str:
@@ -38,6 +41,7 @@ def create_agent(
         tools=[
             make_guardar_lead(lead_service),
             make_solicitar_contacto_humano(handoff_service),
+            make_search_knowledge_base(knowledge_service),
         ],
     )
 

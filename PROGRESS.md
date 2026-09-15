@@ -91,13 +91,20 @@ DoD: flujo end-to-end en el navegador.
 
 ## F5 · `feature/rag` · P0
 
-DoD: AT de RAG y sin datos (AT-06, AT-07).
+DoD: AT de RAG y sin datos (AT-06, AT-07). **Cumplido con el embedder determinista; falta una corrida de ingesta con embeddings reales.**
 
-- [ ] `kb/*.md` (15–18 documentos)
-- [ ] `scripts/ingest_kb.py` (idempotente por hash)
-- [ ] Tabla `kb_chunks` + índice HNSW
-- [ ] Tool `search_knowledge_base`
-- [ ] Chequeo de `embedding_model` al arrancar
+- [x] `kb/*.md` — 18 documentos, 71 fragmentos, sin marcas ni precios
+- [x] `scripts/ingest_kb.py` idempotente por hash (verificado: segunda corrida re-embebe 0)
+- [x] Tabla `kb_chunks` + índice HNSW coseno + extensión `vector` creada por la migración
+- [x] Tool `search_knowledge_base` con umbral, filtro por categoría y `no_results`
+- [x] Chequeo de `embedding_model` al arrancar (falla con mensaje que pide re-ingesta)
+- [x] Adaptador de embeddings de Gemini, con el caso especial de `gemini-embedding-2` (sin `task_type`)
+- [x] `docs/kb-afirmaciones-a-revisar.md` con las afirmaciones a verificar
+- [ ] **Ingesta con embeddings reales** — necesita `GOOGLE_API_KEY`
+
+Verificado el 2026-09-15: 76 tests en verde, mypy strict limpio (71 archivos), ruff limpio. AT-06 (consulta la KB y responde con lo recuperado, con título/fuente/score y en orden de score) y AT-07 (sin datos y con KB vacía devuelve `no_results` y el agente usa la frase honesta del baseline).
+
+Nota sobre el umbral: `RAG_MIN_SCORE` vale 0.55 en producción, calibrado para un embedder real. `FakeEmbeddings` es bolsa de palabras y su distribución de scores es otra (medido sobre la KB real: consulta relevante ~0.55, irrelevante ~0.07), así que los tests usan 0.35. Lo que verifican es el cableado del umbral, no la calidad semántica. **El 0.55 de producción hay que re-calibrarlo con embeddings reales.**
 
 ## F6 · `feature/guardrails` · P0 (L2/L4 P1)
 
