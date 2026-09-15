@@ -1,4 +1,5 @@
 from dataclasses import dataclass, replace
+from typing import Any
 from uuid import UUID
 
 from asesor.domain.enums import (
@@ -41,7 +42,7 @@ class LeadUpdate:
     motorizacion_interes: Motorizacion | None = None
     nivel_interes: NivelInteres | None = None
 
-    def as_dict(self) -> dict[str, object]:
+    def as_dict(self) -> dict[str, Any]:
         return {
             "nombre": self.nombre,
             "telefono": self.telefono,
