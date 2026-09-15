@@ -1,6 +1,7 @@
 import pytest
 
-from asesor.domain.contact import InvalidPhoneError, normalize_phone
+from asesor.domain.contact import normalize_phone
+from asesor.domain.errors import InvalidPhoneError
 
 
 @pytest.mark.parametrize(
