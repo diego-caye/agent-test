@@ -6,9 +6,11 @@ from google.adk.sessions import BaseSessionService, DatabaseSessionService
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from asesor.agent.factory import APP_NAME, create_adk_app, create_agent
+from asesor.application.handoff_service import HandoffService
 from asesor.application.lead_service import LeadService
 from asesor.config import Settings
 from asesor.infrastructure.db.engine import create_engine, create_session_factory
+from asesor.infrastructure.db.handoff_repository import SqlHandoffRepository
 from asesor.infrastructure.db.lead_repository import SqlLeadRepository
 
 
@@ -17,6 +19,7 @@ class Container:
     settings: Settings
     engine: AsyncEngine
     lead_service: LeadService
+    handoff_service: HandoffService
     session_service: BaseSessionService
     runner: Runner
 
@@ -27,10 +30,12 @@ def build_container(
     model: str | BaseLlm | None = None,
 ) -> Container:
     engine = create_engine(settings.database_url)
-    lead_service = LeadService(SqlLeadRepository(create_session_factory(engine)))
+    session_factory = create_session_factory(engine)
+    lead_service = LeadService(SqlLeadRepository(session_factory))
+    handoff_service = HandoffService(SqlHandoffRepository(session_factory))
 
     sessions = session_service or DatabaseSessionService(db_url=settings.database_url)
-    agent = create_agent(settings, lead_service, model)
+    agent = create_agent(settings, lead_service, handoff_service, model)
     runner = Runner(
         app=create_adk_app(settings, agent),
         session_service=sessions,
@@ -40,6 +45,7 @@ def build_container(
         settings=settings,
         engine=engine,
         lead_service=lead_service,
+        handoff_service=handoff_service,
         session_service=sessions,
         runner=runner,
     )
