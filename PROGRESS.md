@@ -80,14 +80,19 @@ Hallazgo importante: el autogenerate de Alembic veía las tablas de ADK (`sessio
 
 ## F4 · `feature/frontend` · P0
 
-DoD: flujo end-to-end en el navegador.
+DoD: flujo end-to-end en el navegador. **Código completo; la verificación del camino feliz en navegador está bloqueada por la falta de `GOOGLE_API_KEY` real.**
 
-- [ ] Plan de diseño (colores, tipografías, layout ASCII)
-- [ ] Sidebar de conversaciones + panel de chat + panel dev
-- [ ] Streaming token a token, chips de actividad
-- [ ] Tarjeta HITL
-- [ ] Feedback 👍/👎
-- [ ] Tipos desde OpenAPI, tests vitest (parser SSE, reducer)
+- [x] Plan de diseño en `docs/ui.md` (paleta azul noche + ámbar, tipografía, layout ASCII, principios y anti-patrones)
+- [x] Sidebar de conversaciones + panel de chat + panel dev plegable
+- [x] Streaming token a token con cursor, chips de actividad por tool
+- [x] Tarjeta HITL con motivo en lenguaje natural y aviso de ticket
+- [x] Errores que dicen qué hacer + botón Reintentar
+- [x] Tipos generados desde `/openapi.json` (`npm run gen:types`)
+- [x] Tests vitest del parser SSE y del reducer del chat (17 casos)
+- [ ] **Verificación del camino feliz en navegador** — necesita una `GOOGLE_API_KEY` con billing
+- [ ] Feedback 👍/👎 — movido a F7, junto con el endpoint que lo respalda
+
+Verificado el 2026-09-15: `tsc --noEmit` limpio con `noUncheckedIndexedAccess`, `vite build` en verde, 17 tests de vitest en verde, y los tres contenedores arriba con el proxy del frontend llegando al backend. El camino de error sí se puede ejercer hoy (el backend responde `error` con el placeholder de API key) pero el de streaming, chips y tarjeta HITL no.
 
 ## F5 · `feature/rag` · P0
 
