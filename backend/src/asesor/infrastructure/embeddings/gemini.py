@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from typing import Any, cast
 
 from google import genai
 from google.genai import types
@@ -47,7 +48,10 @@ class GeminiEmbeddings:
             payload = [prefix + text for text in texts]
 
         response = await self._client.aio.models.embed_content(
-            model=self._model, contents=payload, config=config
+            model=self._model,
+            # list[str] es invariante frente a la unión que declara el SDK.
+            contents=cast("Any", payload),
+            config=config,
         )
 
         embeddings = response.embeddings or []

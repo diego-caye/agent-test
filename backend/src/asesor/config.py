@@ -41,6 +41,13 @@ class Settings(BaseSettings):
     google_api_key: str | None = None
     google_genai_use_vertexai: bool = False
     ollama_api_base: str | None = None
+    # Ollama recorta el contexto en silencio si no se le dice cuánto usar. Con
+    # 16 GB de VRAM, 16384 es holgado para un modelo de ~10 GB.
+    ollama_context_length: int = Field(default=16384, gt=0)
+    # Los modelos con capacidad de "thinking" emiten su razonamiento como texto
+    # visible si no se desactiva. Para un chat conversacional estorba y agrega
+    # latencia (spec 05 §3: nivel de thinking bajo).
+    ollama_think: bool = False
 
     agent_model: str
     guardrail_model: str
@@ -94,8 +101,21 @@ class Settings(BaseSettings):
                     "LLM_PROVIDER=gemini requires GOOGLE_API_KEY "
                     "(or GOOGLE_GENAI_USE_VERTEXAI=true with GCP credentials)"
                 )
-        elif self.llm_provider is LlmProviderName.OLLAMA and not self.ollama_api_base:
-            raise ValueError("LLM_PROVIDER=ollama requires OLLAMA_API_BASE")
+        elif self.llm_provider is LlmProviderName.OLLAMA:
+            if not self.ollama_api_base:
+                raise ValueError("LLM_PROVIDER=ollama requires OLLAMA_API_BASE")
+            # El prefijo ollama/ puede provocar loops de tool-calling e ignorar
+            # contexto; LiteLLM solo trata ollama_chat/ como modelo conversacional.
+            if self.agent_model.startswith("ollama/"):
+                raise ValueError(
+                    "AGENT_MODEL debe usar el prefijo 'ollama_chat/', no 'ollama/' "
+                    f"(recibido: {self.agent_model})"
+                )
+            if not self.agent_model.startswith("ollama_chat/"):
+                raise ValueError(
+                    "Con LLM_PROVIDER=ollama, AGENT_MODEL debe empezar con 'ollama_chat/' "
+                    f"(recibido: {self.agent_model})"
+                )
 
         if self.embeddings_provider is EmbeddingsProviderName.OLLAMA and not self.ollama_api_base:
             raise ValueError("EMBEDDINGS_PROVIDER=ollama requires OLLAMA_API_BASE")
