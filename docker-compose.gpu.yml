@@ -1,0 +1,15 @@
+# GPU NVIDIA para Ollama. Va aparte a propósito: pedir GPU en el compose base
+# rompe el arranque en equipos sin NVIDIA o sin el container toolkit instalado.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.local-llm.yml \
+#                  -f docker-compose.gpu.yml up -d
+
+services:
+  ollama:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
