@@ -41,10 +41,11 @@ Todos los campos son opcionales (upsert parcial: solo se actualiza lo que llega)
 | `urgencia` | `enum?` | `BAJA \| MEDIA \| ALTA` |
 
 **Comportamiento:**
-1. Requiere confirmación del usuario antes de ejecutarse — vía confirmación nativa de tools de ADK, con fallback si no queda estable (spec 04 §HITL, ADR-002).
-2. **Idempotente por sesión:** máximo un handoff `OPEN` por `session_id`. Si ya existe uno abierto, la tool no crea otro: devuelve el existente (`status: "ok"`, mismo `data.handoff`) y el agente lo comunica ("ya tienes una solicitud en curso").
+1. Requiere confirmación del usuario antes de ejecutarse — vía confirmación nativa de tools de ADK (`tool_context.request_confirmation`). El spike de F3 confirmó que funciona sobre nuestro SSE, así que **no se implementa fallback**: ver ADR-002.
+2. **Idempotente por sesión:** máximo un handoff `OPEN` por `session_id`, garantizado por un índice único parcial en Postgres (`WHERE status = 'OPEN'`) además de la comprobación del servicio. Si ya existe uno abierto, la tool no crea otro: devuelve el existente con `ya_existia: true` y el agente lo comunica ("ya tienes una solicitud en curso").
 3. Al confirmarse, crea el handoff en estado `OPEN` (transiciones `OPEN → IN_PROGRESS → CLOSED` gestionadas por `PATCH /api/v1/handoffs/{id}`, spec 02) y la etapa del diálogo pasa a `DERIVADO` (spec 04).
-4. Devuelve `{status: "ok", data: {handoff_id, motivo, status: "OPEN"}}`.
+   Al cancelarse, no crea nada y la etapa vuelve a `stage_previa`.
+4. Devuelve `{status: "ok", data: {handoff_id, ticket, motivo, status: "OPEN", ya_existia}}`. El `ticket` es `TICK-` más el id de la tabla con padding: persistente y auditable, a diferencia del `Math.random` del baseline (brecha #3).
 
 ## 4. `search_knowledge_base`
 

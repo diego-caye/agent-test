@@ -18,12 +18,25 @@ config.set_main_option("sqlalchemy.url", get_settings().database_url)
 target_metadata = Base.metadata
 
 
+def include_object(
+    obj: object, name: str | None, type_: str, reflected: bool, compare_to: object
+) -> bool:
+    """Ignora las tablas que no son nuestras.
+
+    ADK crea y gestiona sus propias tablas de sesiones en la misma base
+    (sessions, events, app_states, user_states, adk_internal_metadata). Sin este
+    filtro, el autogenerate las ve como tablas sobrantes y emite DROP TABLE.
+    """
+    return not (type_ == "table" and reflected and name not in target_metadata.tables)
+
+
 def run_migrations_offline() -> None:
     context.configure(
         url=config.get_main_option("sqlalchemy.url"),
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        include_object=include_object,
     )
 
     with context.begin_transaction():
@@ -31,7 +44,11 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
-    context.configure(connection=connection, target_metadata=target_metadata)
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        include_object=include_object,
+    )
 
     with context.begin_transaction():
         context.run_migrations()

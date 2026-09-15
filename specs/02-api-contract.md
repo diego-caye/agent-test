@@ -69,11 +69,12 @@ Formato `event: <nombre>\ndata: <json>\n\n`.
 | `tool.started` | `{"name": str}` | Antes de ejecutar una tool |
 | `tool.finished` | `{"name", "status", "duration_ms"}` | Después de ejecutar una tool |
 | `lead.updated` | `{"lead": {...}, "etapa": str}` | Tras `guardar_lead` o cambio de etapa |
-| `hitl.confirmation_required` | `{"confirmation_id", "motivo", "resumen", "canal_preferido"}` | El agente propone `solicitar_contacto_humano` y espera confirmación |
+| `hitl.confirmation_required` | `{"confirmation_id", "motivo", "resumen", "canal_preferido", "urgencia"}` | El agente propone `solicitar_contacto_humano` y espera confirmación |
+| `handoff.created` | `{"handoff_id", "ticket", "motivo", "status", "ya_existia"}` | La derivación se confirmó y el handoff quedó abierto. `ya_existia: true` cuando la idempotencia devolvió uno ya abierto (spec 03 §3) |
 | `guardrail.triggered` | `{"layer": "L1"\|"L2"\|"L4", "category": str}` | Un guardrail bloqueó o modificó la respuesta |
 | `error` | `{"code", "message", "retryable": bool}` | Fallo de tool, modelo, RAG o DB (spec 07) |
 
-Un turno normal: `tool.started/finished`* → `message.delta`* → `lead.updated`? → `message.completed`. Un turno con HITL pendiente termina en `hitl.confirmation_required` sin `message.completed`; el stream se cierra y se reanuda con `POST /chat/confirmations`.
+Un turno normal: `tool.started/finished`* → `message.delta`* → `lead.updated`? → `message.completed`. Un turno con HITL pendiente emite `hitl.confirmation_required` y cierra el stream; se reanuda con `POST /chat/confirmations`, que emite la misma secuencia (más `handoff.created` si se aprobó).
 
 ## 3. Errores HTTP comunes
 

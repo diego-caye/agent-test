@@ -5,9 +5,10 @@ from uuid import UUID
 
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
+from google.adk.events import Event
 
 from asesor.api.dependencies import UserId
-from asesor.api.dtos import ChatRequest
+from asesor.api.dtos import ChatRequest, ConfirmationRequest
 from asesor.api.errors import NotFoundError
 from asesor.api.sse import SseEvent, translate
 from asesor.application.chat_service import ChatService, SessionNotFoundError
@@ -18,14 +19,18 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/chat", tags=["chat"])
 
+SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+
 
 async def _stream(
-    container: Container, service: ChatService, user_id: UUID, body: ChatRequest
+    container: Container,
+    session_id: str,
+    user_id: UUID,
+    events: AsyncIterator[Event],
 ) -> AsyncIterator[str]:
     with turn_span(
-        session_id=body.session_id, user_id=str(user_id), settings=container.settings
+        session_id=session_id, user_id=str(user_id), settings=container.settings
     ) as turn:
-        events = service.run_turn(user_id, body.session_id, body.message)
         completed: dict[str, Any] = {}
         reported_error = False
 
@@ -58,7 +63,7 @@ async def _stream(
         log_turn(
             {
                 "event": "chat.turn",
-                "session_id": body.session_id,
+                "session_id": session_id,
                 "user_id": str(user_id),
                 "provider": container.settings.llm_provider.value,
                 **completed,
@@ -66,18 +71,41 @@ async def _stream(
         )
 
 
+async def _guarded_service(request: Request, user_id: UUID, session_id: str) -> ChatService:
+    container: Container = request.app.state.container
+    service = ChatService(container.runner, container.session_service)
+    try:
+        await service.get_session(user_id, session_id)
+    except SessionNotFoundError as exc:
+        raise NotFoundError("Session not found") from exc
+    return service
+
+
 @router.post("/stream")
 async def chat_stream(request: Request, user_id: UserId, body: ChatRequest) -> StreamingResponse:
     container: Container = request.app.state.container
-    service = ChatService(container.runner, container.session_service)
+    service = await _guarded_service(request, user_id, body.session_id)
 
-    try:
-        await service.get_session(user_id, body.session_id)
-    except SessionNotFoundError as exc:
-        raise NotFoundError("Session not found") from exc
-
+    events = service.run_turn(user_id, body.session_id, body.message)
     return StreamingResponse(
-        _stream(container, service, user_id, body),
+        _stream(container, body.session_id, user_id, events),
         media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        headers=SSE_HEADERS,
+    )
+
+
+@router.post("/confirmations")
+async def chat_confirmation(
+    request: Request, user_id: UserId, body: ConfirmationRequest
+) -> StreamingResponse:
+    container: Container = request.app.state.container
+    service = await _guarded_service(request, user_id, body.session_id)
+
+    events = service.resume_with_confirmation(
+        user_id, body.session_id, body.confirmation_id, body.approved
+    )
+    return StreamingResponse(
+        _stream(container, body.session_id, user_id, events),
+        media_type="text/event-stream",
+        headers=SSE_HEADERS,
     )

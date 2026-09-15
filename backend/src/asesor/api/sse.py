@@ -12,6 +12,8 @@ from asesor.domain.enums import ToolStatus
 logger = logging.getLogger(__name__)
 
 LEAD_TOOL_NAME = "guardar_lead"
+HANDOFF_TOOL_NAME = "solicitar_contacto_humano"
+CONFIRMATION_CALL_NAME = "adk_request_confirmation"
 UPSTREAM_ERROR_MESSAGE = "No pudimos generar la respuesta. Reintenta en unos segundos."
 
 
@@ -43,6 +45,22 @@ class TurnMetrics:
     @property
     def latency_ms(self) -> int:
         return int((time.perf_counter() - self.started_at) * 1000)
+
+
+def _confirmation_event(call: Any) -> SseEvent:
+    """Traduce el adk_request_confirmation de ADK al contrato de spec 02."""
+    args = dict(call.args or {})
+    payload = dict((args.get("toolConfirmation") or {}).get("payload") or {})
+    return SseEvent(
+        "hitl.confirmation_required",
+        {
+            "confirmation_id": call.id,
+            "motivo": payload.get("motivo"),
+            "resumen": payload.get("resumen"),
+            "canal_preferido": payload.get("canal_preferido"),
+            "urgencia": payload.get("urgencia"),
+        },
+    )
 
 
 def _text_of(event: Event) -> str:
@@ -78,6 +96,9 @@ async def translate(events: AsyncIterator[Event], trace_id: str) -> AsyncIterato
             continue
 
         for call in event.get_function_calls():
+            if call.name == CONFIRMATION_CALL_NAME:
+                yield _confirmation_event(call)
+                continue
             tool_started_at[call.name or ""] = time.perf_counter()
             yield SseEvent("tool.started", {"name": call.name})
 
@@ -93,11 +114,24 @@ async def translate(events: AsyncIterator[Event], trace_id: str) -> AsyncIterato
                 {"name": name, "status": status, "duration_ms": duration_ms},
             )
 
+            data = payload.get("data") or {}
+
             if name == LEAD_TOOL_NAME and status == ToolStatus.OK.value:
-                data = payload.get("data") or {}
                 yield SseEvent(
                     "lead.updated",
                     {"lead": data.get("lead"), "etapa": data.get("etapa")},
+                )
+
+            if name == HANDOFF_TOOL_NAME and data.get("handoff_id"):
+                yield SseEvent(
+                    "handoff.created",
+                    {
+                        "handoff_id": data.get("handoff_id"),
+                        "ticket": data.get("ticket"),
+                        "motivo": data.get("motivo"),
+                        "status": data.get("status"),
+                        "ya_existia": data.get("ya_existia", False),
+                    },
                 )
 
         text = _text_of(event)

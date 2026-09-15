@@ -1,13 +1,17 @@
 from dataclasses import dataclass, replace
+from datetime import datetime
 from typing import Any
 from uuid import UUID
 
 from asesor.domain.enums import (
     CanalPreferido,
+    HandoffStatus,
+    MotivoHandoff,
     Motorizacion,
     NivelInteres,
     Stage,
     TipoVehiculo,
+    Urgencia,
     UsoPrincipal,
 )
 
@@ -60,6 +64,34 @@ class LeadUpdate:
 
     def carries_contact_data(self) -> bool:
         return self.telefono is not None or self.email is not None
+
+
+@dataclass(frozen=True, slots=True)
+class Handoff:
+    id: int
+    session_id: str
+    user_id: UUID
+    motivo: MotivoHandoff
+    resumen_requerimiento: str
+    status: HandoffStatus
+    created_at: datetime
+    canal_preferido: CanalPreferido | None = None
+    urgencia: Urgencia | None = None
+
+    @property
+    def ticket(self) -> str:
+        return f"TICK-{self.id:05d}"
+
+
+_ALLOWED_HANDOFF_TRANSITIONS: dict[HandoffStatus, frozenset[HandoffStatus]] = {
+    HandoffStatus.OPEN: frozenset({HandoffStatus.IN_PROGRESS, HandoffStatus.CLOSED}),
+    HandoffStatus.IN_PROGRESS: frozenset({HandoffStatus.CLOSED}),
+    HandoffStatus.CLOSED: frozenset(),
+}
+
+
+def can_transition(current: HandoffStatus, target: HandoffStatus) -> bool:
+    return target in _ALLOWED_HANDOFF_TRANSITIONS[current]
 
 
 @dataclass(frozen=True, slots=True)

@@ -56,7 +56,7 @@ async def clean_database(settings: Settings) -> None:
     engine = create_engine(settings.database_url)
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)
-        await connection.execute(text("TRUNCATE TABLE leads"))
+        await connection.execute(text("TRUNCATE TABLE leads, handoffs"))
     await engine.dispose()
 
 
