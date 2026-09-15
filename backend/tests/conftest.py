@@ -14,7 +14,10 @@ TEST_DATABASE_URL = os.environ.get(
 )
 
 TEST_ENV = {
-    "APP_ENV": "test",
+    # dev + ENABLE_FAULT_INJECTION para poder ejercer los AT de fallos. Que el
+    # header se ignore fuera de dev lo cubre test_config (fault_injection_active).
+    "APP_ENV": "dev",
+    "ENABLE_FAULT_INJECTION": "true",
     "DATABASE_URL": TEST_DATABASE_URL,
     "ADMIN_TOKEN": "test-admin-token",
     "LLM_PROVIDER": "gemini",

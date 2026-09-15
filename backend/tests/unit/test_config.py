@@ -37,12 +37,27 @@ def test_gemini_requires_api_key_unless_vertex() -> None:
     assert make(google_api_key=None, google_genai_use_vertexai=True).google_api_key is None
 
 
+OLLAMA = {
+    "llm_provider": LlmProviderName.OLLAMA,
+    "ollama_api_base": "http://localhost:11434",
+    "agent_model": "ollama_chat/gemma4:latest",
+}
+
+
 def test_ollama_requires_api_base() -> None:
     with pytest.raises(ValidationError, match="OLLAMA_API_BASE"):
-        make(llm_provider=LlmProviderName.OLLAMA)
+        make(**{**OLLAMA, "ollama_api_base": None})
 
-    settings = make(llm_provider=LlmProviderName.OLLAMA, ollama_api_base="http://localhost:11434")
-    assert settings.llm_provider is LlmProviderName.OLLAMA
+    assert make(**OLLAMA).llm_provider is LlmProviderName.OLLAMA
+
+
+def test_ollama_rechaza_el_prefijo_equivocado() -> None:
+    # ollama/ puede provocar loops de tool-calling: solo ollama_chat/ es válido.
+    with pytest.raises(ValidationError, match="ollama_chat/"):
+        make(**{**OLLAMA, "agent_model": "ollama/gemma4:latest"})
+
+    with pytest.raises(ValidationError, match="ollama_chat/"):
+        make(**{**OLLAMA, "agent_model": "gemma4:latest"})
 
 
 def test_ollama_embeddings_require_api_base() -> None:

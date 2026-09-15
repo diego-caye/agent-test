@@ -1,12 +1,13 @@
 import logging
 from collections.abc import AsyncIterator
-from typing import Any
+from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Header, Request
 from fastapi.responses import StreamingResponse
 from google.adk.events import Event
 
+from asesor.agent.guardrails.faults import parse_fault
 from asesor.api.dependencies import UserId
 from asesor.api.dtos import ChatRequest, ConfirmationRequest
 from asesor.api.errors import NotFoundError
@@ -82,11 +83,19 @@ async def _guarded_service(request: Request, user_id: UUID, session_id: str) -> 
 
 
 @router.post("/stream")
-async def chat_stream(request: Request, user_id: UserId, body: ChatRequest) -> StreamingResponse:
+async def chat_stream(
+    request: Request,
+    user_id: UserId,
+    body: ChatRequest,
+    x_debug_fault: Annotated[str | None, Header()] = None,
+) -> StreamingResponse:
     container: Container = request.app.state.container
     service = await _guarded_service(request, user_id, body.session_id)
 
-    events = service.run_turn(user_id, body.session_id, body.message)
+    # El header se ignora fuera de dev, aunque venga (spec 07 §4).
+    fault = parse_fault(x_debug_fault) if container.settings.fault_injection_active else None
+
+    events = service.run_turn(user_id, body.session_id, body.message, fault)
     return StreamingResponse(
         _stream(container, body.session_id, user_id, events),
         media_type="text/event-stream",

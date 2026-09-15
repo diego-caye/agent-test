@@ -15,28 +15,14 @@ from pathlib import Path
 from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from asesor.config import EmbeddingsProviderName, Settings, get_settings
-from asesor.domain.knowledge import EmbeddingsPort
+from asesor.config import get_settings
+from asesor.infrastructure.container import build_embeddings
 from asesor.infrastructure.db.engine import create_engine, create_session_factory
 from asesor.infrastructure.db.models import KbChunkRow
 from asesor.infrastructure.embeddings.fake import FakeEmbeddings
-from asesor.infrastructure.embeddings.gemini import GeminiEmbeddings
 from asesor.infrastructure.kb_loader import load_chunks
 
 BATCH_SIZE = 32
-
-
-def build_embeddings(settings: Settings) -> EmbeddingsPort:
-    if settings.embeddings_provider is EmbeddingsProviderName.GEMINI:
-        return GeminiEmbeddings(
-            model=settings.embeddings_model,
-            api_key=settings.google_api_key,
-            use_vertexai=settings.google_genai_use_vertexai,
-        )
-    raise SystemExit(
-        f"EMBEDDINGS_PROVIDER={settings.embeddings_provider.value} todavía no está soportado "
-        "en la ingesta (Ollama llega en F8)."
-    )
 
 
 async def ingest(kb_dir: Path, *, dry_run: bool, use_fake: bool) -> int:

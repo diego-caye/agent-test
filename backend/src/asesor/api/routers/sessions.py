@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, Request
 
+from asesor.agent.parts import visible_text
 from asesor.agent.state import read_dialog_state
 from asesor.api.dependencies import UserId
 from asesor.api.dtos import (
@@ -57,9 +58,9 @@ async def list_messages(request: Request, user_id: UserId, session_id: str) -> l
 
     messages: list[MessageDto] = []
     for event in session.events:
-        if event.content is None or not event.content.parts:
+        if event.content is None:
             continue
-        text = "".join(part.text or "" for part in event.content.parts)
+        text = visible_text(event.content)
         if not text or event.partial:
             continue
         messages.append(
