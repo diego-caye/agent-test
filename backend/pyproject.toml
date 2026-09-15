@@ -13,6 +13,9 @@ dependencies = [
     "psycopg[binary]>=3.1",
     "google-adk==2.9.1",
     "alembic>=1.20.0",
+    "opentelemetry-sdk>=1.29",
+    "opentelemetry-exporter-otlp-proto-http>=1.29",
+    "openinference-instrumentation-google-adk>=0.1.28",
 ]
 
 [dependency-groups]
@@ -49,6 +52,9 @@ plugins = ["pydantic.mypy"]
 [[tool.mypy.overrides]]
 module = ["google.adk.*", "pgvector.*"]
 ignore_missing_imports = true
+# ADK reexporta simbolos sin __all__ explicito (p. ej. StreamingMode vive en un
+# modulo privado y solo se expone via reexport).
+implicit_reexport = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
