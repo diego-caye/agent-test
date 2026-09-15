@@ -6,7 +6,10 @@ from google.adk.apps import App
 from google.adk.apps._configs import ResumabilityConfig
 from google.adk.apps.app import EventsCompactionConfig
 from google.adk.models.base_llm import BaseLlm
+from google.adk.plugins.base_plugin import BasePlugin
 
+from asesor.agent.guardrails.faults import FaultInjectionPlugin
+from asesor.agent.guardrails.plugin import GuardrailPlugin
 from asesor.agent.instruction import render_instruction
 from asesor.agent.state import read_dialog_state
 from asesor.agent.tools.handoff_tools import make_solicitar_contacto_humano
@@ -46,10 +49,20 @@ def create_agent(
     )
 
 
+def create_plugins(settings: Settings) -> list[BasePlugin]:
+    plugins: list[BasePlugin] = [
+        GuardrailPlugin(settings.guardrail_canary_token, settings.max_tool_calls_per_turn)
+    ]
+    if settings.fault_injection_active:
+        plugins.append(FaultInjectionPlugin())
+    return plugins
+
+
 def create_adk_app(settings: Settings, agent: Agent) -> App:
     return App(
         name=APP_NAME,
         root_agent=agent,
+        plugins=create_plugins(settings),
         events_compaction_config=EventsCompactionConfig(
             token_threshold=settings.memory_compaction_token_threshold,
             event_retention_size=settings.memory_compaction_keep_recent,
