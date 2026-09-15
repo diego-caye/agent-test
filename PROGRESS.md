@@ -23,22 +23,24 @@ DoD: specs, `CLAUDE.md` y `PROGRESS.md`. **Parar para revisión.**
 - [x] `CLAUDE.md`
 - [x] `PROGRESS.md`
 - [x] Repo git local inicializado (`main`, `develop`, `docs/specs`), `.gitignore` con `.local/` y `.env`
-- [ ] **Revisión humana de F0** — pendiente. No avanzar a F1 sin aprobación.
+- [x] **Revisión humana de F0** — aprobada 2026-09-15; merge `docs/specs → develop`
 
-Prerrequisitos pendientes fuera de F0 (detalle en `specs/open-questions.md`): repo remoto en GitHub, `gh auth login`, skills ADK (`npx skills add google/agents-cli`), `google-adk` instalado, Python 3.12 real en PATH.
+Prerrequisitos aún pendientes (detalle en `specs/open-questions.md`): repo remoto en GitHub + `gh auth login`, skills ADK (`npx skills add google/agents-cli`), `GOOGLE_API_KEY` real.
 
 ## F1 · `feature/scaffold` · P0
 
-DoD: `make up` y `make lint typecheck test` en verde.
+DoD: `make up` y `make lint typecheck test` en verde. **Cumplido.**
 
-- [ ] Estructura de carpetas (`backend/src/asesor/...`, `frontend/src/...`)
-- [ ] `Settings` (pydantic-settings) con validación de combinaciones de provider
-- [ ] `docker-compose.yml` + `Makefile`
-- [ ] `.env.example` comentado
-- [ ] CI (ruff, mypy, pytest, tsc, build)
-- [ ] `GET /healthz`
-- [ ] `FakeLlm` determinista
-- [ ] Plantilla de PR (`.github/pull_request_template.md`)
+- [x] Estructura de carpetas (`backend/src/asesor/...`, `frontend/src/...`)
+- [x] `Settings` (pydantic-settings) con validación de combinaciones de provider
+- [x] `docker-compose.yml` (db pgvector + backend + frontend) + `Makefile`
+- [x] `.env.example` comentado, con IDs de modelo verificados
+- [x] CI (ruff, mypy, pytest, tsc, build)
+- [x] `GET /healthz`
+- [x] `FakeLlm` determinista
+- [x] Plantilla de PR (`.github/pull_request_template.md`)
+
+Verificado el 2026-09-15: `ruff check` + `ruff format --check` limpios, `mypy --strict` sin errores en 20 archivos, 17 tests pytest en verde, `tsc --noEmit` y `vite build` en verde, y `docker compose up` con los tres servicios *healthy* respondiendo `/healthz` (directo y a través del proxy del frontend). `google-adk==2.9.1` importa en el entorno.
 
 ## F2 · `feature/agent-core` · P0
 

@@ -22,7 +22,21 @@ Python 3.12 + uv + FastAPI + Pydantic v2 + SQLAlchemy 2 async + Alembic + `googl
 
 ## Estado actual
 
-F0 completa (specs). Repo git inicializado localmente en esta sesión; **falta remoto en GitHub y `gh auth login`** — ver `specs/open-questions.md`. F1 no ha empezado.
+F0 (specs) y F1 (scaffold) completas y mergeadas a `develop`. **Falta remoto en GitHub y `gh auth login`**, así que los merges de fase se hacen localmente con `git merge --no-ff` y el cuerpo del merge commit hace de descripción de PR — ver `specs/open-questions.md`.
+
+## Comandos
+
+`make` no está instalado en Windows; el `Makefile` es la interfaz canónica (CI, Docker, Linux/macOS) y estos son los equivalentes directos:
+
+```bash
+cd backend && uv run ruff check . && uv run ruff format --check .   # lint
+cd backend && uv run mypy                                          # typecheck
+cd backend && uv run pytest                                        # tests
+cd frontend && npm run typecheck && npm run build                  # frontend
+docker compose up -d --build                                       # make up
+```
+
+En esta máquina los puertos del host están desplazados por el `.env` local (backend 8008, frontend 5174) porque 8000 y 5173 ya están ocupados por otros contenedores.
 
 ## Dónde mirar cada cosa
 
