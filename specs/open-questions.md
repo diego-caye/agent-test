@@ -23,12 +23,19 @@ Detectado al arrancar F0 (2026-09-15) y actualizado al cerrar F1.
 - **GNU `make` no está instalado en Windows** (sí Chocolatey). El `Makefile` es la interfaz canónica y funciona en CI, Docker y Linux/macOS. En esta máquina los comandos se corren directamente (`cd backend && uv run pytest`, etc.). **Opcional:** `choco install make -y` desde una consola con privilegios de administrador.
 - **Puertos ocupados en esta máquina.** Otros contenedores del usuario ya usan 8000 y 5173. `docker-compose.yml` publica puertos configurables (`BACKEND_PORT`, `FRONTEND_PORT`, `POSTGRES_PORT`) y el `.env` local los desplaza a 8008 y 5174. Los defaults del repo siguen siendo 8000/5173 para quien lo clone.
 
-## Decisiones técnicas a verificar en F2 (documentar en `specs/notes/adk-api.md`)
+- **Otro Postgres nativo en el host.** Hay un servicio `postgresql-x64-18` escuchando en 0.0.0.0:5432, así que el contenedor del proyecto solo pudo bindear IPv6 y `localhost:5432` iba al Postgres nativo (fallaba la autenticación). El compose ahora publica `POSTGRES_PORT=5442` vía `.env`. En CI y en una máquina limpia el default sigue siendo 5432.
 
-- Prefijo exacto de scope de usuario en `DatabaseSessionService` de ADK 2.x (spec 06 §1) para persistir el lead a nivel usuario, no sesión.
-- Firma exacta de `EventsCompactionConfig` (parámetros de umbral de tokens y de eventos recientes a conservar).
-- Estabilidad de la confirmación nativa de tools de ADK 2.x sobre streaming SSE propio (spike de F3, ver ADR-002 cuando se escriba).
-- Si el SDK de ADK 2.x expone un parámetro de nivel de "thinking" configurable por env para el modelo del agente (spec 05 §3).
+## Resuelto en F2 (documentado en `specs/notes/adk-api.md`)
+
+- Prefijo de scope de usuario: es `user:` (también existen `app:` y `temp:`). Decisión tomada: **no** se usa para el lead — la tabla `leads` es la única fuente de verdad (spec 06 §1).
+- `EventsCompactionConfig(token_threshold=..., event_retention_size=..., summarizer=...)`, verificado. Está cableado; falta afinar umbrales con conversaciones largas (F7).
+- Inyección de estado en la instrucción: `instruction` acepta un callable `(ReadonlyContext) -> str | Awaitable[str]`. Se usa esa vía en lugar de placeholders `{state_key}`, porque la ficha del lead es JSON y sus llaves colisionan con el templating.
+
+## Sigue abierto para F3 y más adelante
+
+- Estabilidad de la confirmación nativa de tools de ADK 2.x (`ToolContext.request_confirmation`, `EventActions.requested_tool_confirmations` — ambos existen) sobre nuestro streaming SSE. Spike de F3 y ADR-002.
+- Si el SDK de ADK 2.x expone un nivel de "thinking" configurable por env para el modelo del agente (spec 05 §3). No se investigó en F2: no bloquea, es una optimización de latencia.
+- `App(name=...)` debe coincidir con el directorio del agente para que `adk eval` encuentre las sesiones. Nuestra estructura no sigue la convención de directorios de ADK; revisar al montar el evalset en F7.
 
 ## Otras decisiones abiertas, no bloqueantes
 

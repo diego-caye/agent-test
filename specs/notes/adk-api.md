@@ -81,7 +81,7 @@ Métodos verificados: `create_session(*, app_name, user_id, state=None, session_
 | `app:` | todos los usuarios |
 | `temp:` | solo la invocación actual |
 
-La etapa y las banderas van sin prefijo (por sesión). El nombre y la ficha del lead se replican bajo `user:` para el saludo entre sesiones; la fuente de verdad sigue siendo la tabla `leads` (spec 06 §1).
+La etapa y las banderas van sin prefijo (por sesión). El lead **no** se replica bajo `user:`: la tabla `leads` es la única fuente de verdad y el proveedor de instrucción la consulta en cada turno (spec 06 §1). `user:` queda disponible por si alguna bandera futura necesita alcance de usuario.
 
 ## 5. Compactación de memoria (resuelve la duda abierta de spec 06 §2)
 
