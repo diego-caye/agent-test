@@ -9,6 +9,7 @@ from google.adk.sessions import BaseSessionService, DatabaseSessionService
 from asesor.api.errors import register_error_handlers
 from asesor.api.routers import chat, handoffs, health, sessions
 from asesor.config import Settings, get_settings
+from asesor.domain.knowledge import EmbeddingsPort
 from asesor.infrastructure.container import build_container, close_container
 from asesor.infrastructure.telemetry import setup_telemetry
 
@@ -17,15 +18,19 @@ def create_app(
     settings: Settings | None = None,
     session_service: BaseSessionService | None = None,
     model: str | BaseLlm | None = None,
+    embeddings: EmbeddingsPort | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         setup_telemetry(settings)
-        container = build_container(settings, session_service, model)
+        container = build_container(settings, session_service, model, embeddings)
         if isinstance(container.session_service, DatabaseSessionService):
             await container.session_service.prepare_tables()
+        # Falla rápido si la KB se ingirió con otro modelo: son espacios
+        # vectoriales distintos y sus distancias no son comparables (spec 06 §4).
+        await container.knowledge_service.verify_embedding_model()
         app.state.container = container
         try:
             yield
