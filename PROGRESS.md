@@ -96,24 +96,52 @@ Verificado el 2026-09-15: `tsc --noEmit` limpio con `noUncheckedIndexedAccess`, 
 
 ## F5 · `feature/rag` · P0
 
-DoD: AT de RAG y sin datos (AT-06, AT-07).
+DoD: AT de RAG y sin datos (AT-06, AT-07). **Cumplido con el embedder determinista; falta una corrida de ingesta con embeddings reales.**
 
-- [ ] `kb/*.md` (15–18 documentos)
-- [ ] `scripts/ingest_kb.py` (idempotente por hash)
-- [ ] Tabla `kb_chunks` + índice HNSW
-- [ ] Tool `search_knowledge_base`
-- [ ] Chequeo de `embedding_model` al arrancar
+- [x] `kb/*.md` — 18 documentos, 71 fragmentos, sin marcas ni precios
+- [x] `scripts/ingest_kb.py` idempotente por hash (verificado: segunda corrida re-embebe 0)
+- [x] Tabla `kb_chunks` + índice HNSW coseno + extensión `vector` creada por la migración
+- [x] Tool `search_knowledge_base` con umbral, filtro por categoría y `no_results`
+- [x] Chequeo de `embedding_model` al arrancar (falla con mensaje que pide re-ingesta)
+- [x] Adaptador de embeddings de Gemini, con el caso especial de `gemini-embedding-2` (sin `task_type`)
+- [x] `docs/kb-afirmaciones-a-revisar.md` con las afirmaciones a verificar
+- [ ] **Ingesta con embeddings reales** — necesita `GOOGLE_API_KEY`
+
+Verificado el 2026-09-15: 76 tests en verde, mypy strict limpio (71 archivos), ruff limpio. AT-06 (consulta la KB y responde con lo recuperado, con título/fuente/score y en orden de score) y AT-07 (sin datos y con KB vacía devuelve `no_results` y el agente usa la frase honesta del baseline).
+
+Nota sobre el umbral: `RAG_MIN_SCORE` vale 0.55 en producción, calibrado para un embedder real. `FakeEmbeddings` es bolsa de palabras y su distribución de scores es otra (medido sobre la KB real: consulta relevante ~0.55, irrelevante ~0.07), así que los tests usan 0.35. Lo que verifican es el cableado del umbral, no la calidad semántica. **El 0.55 de producción hay que re-calibrarlo con embeddings reales.**
 
 ## F6 · `feature/guardrails` · P0 (L2/L4 P1)
 
-DoD: AT de guardrails y fallos (AT-11 a AT-18).
+DoD: AT de guardrails y fallos (AT-11 a AT-18). **Cumplido salvo L2.**
 
-- [ ] L1 determinista
-- [ ] L3 (tools)
-- [ ] Fallbacks de tool/modelo/RAG/DB
-- [ ] Fault injection (`X-Debug-Fault`)
-- [ ] L2 clasificador (P1)
-- [ ] L4 salida (P1)
+- [x] L1 determinista: longitud, normalización Unicode, invisibles, patrones ES/EN de inyección
+- [x] L3: tope de tool calls por turno (la validación Pydantic y los ids desde `ToolContext` ya venían de F2/F3)
+- [x] L4 salida: fuga del canary y precios/cuotas/stock → mensaje seguro
+- [x] Fallbacks de tool, modelo (backoff + respaldo), RAG y DB
+- [x] Fault injection (`X-Debug-Fault`), solo en dev
+- [ ] L2 clasificador (P1) — **no implementado**; L1 + L4 cubren los AT del reto
+
+Verificado el 2026-09-15: 125 tests en verde, mypy strict limpio (83 archivos), ruff limpio. AT-11 a AT-18 cubiertos, incluidos el fallback por 429 y los dos casos de L4.
+
+**Cambio de contrato (spec 02 §4):** el texto ya no se transmite token a token. L4 necesita ver la respuesta completa antes de que salga, y un delta transmitido no se puede retirar del cliente. El backend acumula y emite un solo `message.delta` ya filtrado. Los chips de tools, la ficha y la tarjeta HITL siguen llegando en vivo. **Pendiente al mergear F4:** actualizar `docs/ui.md`, que todavía describe la escritura token a token.
+
+Hallazgo: `FaultInjectionPlugin` no puede inyectar fallos del modelo, porque ADK captura las excepciones de los plugins y `ResilientLlm` nunca vería el 429. Se inyectan dentro de `ResilientLlm` vía un contextvar por request.
+
+## F8 (adelantada) · modelos locales · P2 → hecha en F6
+
+Adelantada a pedido del humano: sin `GOOGLE_API_KEY`, era lo que desbloqueaba verificar F4, la ingesta real y la calibración del umbral de RAG.
+
+- [x] `ADR-003-modelos-locales.md` con los hallazgos de integración
+- [x] Adaptadores: `LiteLlm` con `ollama_chat/` para el agente, `OllamaEmbeddings` para la KB
+- [x] `google-adk[extensions]` (LiteLLM no viene en la instalación base)
+- [x] `docker-compose.local-llm.yml` + `docker-compose.gpu.yml`
+- [x] `.env.example` con los dos perfiles intercambiables
+- [x] Validación del prefijo `ollama_chat/` y de `num_ctx` explícito en `Settings`
+- [x] KB re-ingerida con `embeddinggemma` y `RAG_MIN_SCORE` calibrado a 0.42
+- [x] Conversación real verificada: saludo, captura de lead, RAG, HITL, guardrails y precios
+
+Medido en una RTX 5080: 1,4–2,2 s por turno conversacional, 12–18 s con tool + RAG, 20–40 s la primera llamada (carga del modelo).
 
 ## F7 · `feature/feedback-evals` · P1
 

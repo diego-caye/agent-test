@@ -64,7 +64,7 @@ Formato `event: <nombre>\ndata: <json>\n\n`.
 
 | Evento | Payload | Cuándo |
 |---|---|---|
-| `message.delta` | `{"delta": str}` | Cada fragmento de texto del modelo |
+| `message.delta` | `{"delta": str}` | Texto del agente. **Se emite una sola vez por turno, con la respuesta completa** (ver §4) |
 | `message.completed` | `{"message_id", "trace_id", "latency_ms", "tokens_in", "tokens_out", "model"}` | Fin del turno (éxito) |
 | `tool.started` | `{"name": str}` | Antes de ejecutar una tool |
 | `tool.finished` | `{"name", "status", "duration_ms"}` | Después de ejecutar una tool |
@@ -75,6 +75,16 @@ Formato `event: <nombre>\ndata: <json>\n\n`.
 | `error` | `{"code", "message", "retryable": bool}` | Fallo de tool, modelo, RAG o DB (spec 07) |
 
 Un turno normal: `tool.started/finished`* → `message.delta`* → `lead.updated`? → `message.completed`. Un turno con HITL pendiente emite `hitl.confirmation_required` y cierra el stream; se reanuda con `POST /chat/confirmations`, que emite la misma secuencia (más `handoff.created` si se aprobó).
+
+## 4. Por qué el texto no se transmite token a token (decidido en F6)
+
+El diseño original enviaba un `message.delta` por cada fragmento del modelo. Al implementar L4 (filtro de salida, spec 07) resultó incompatible: **una vez transmitido un delta, no hay forma de retirarlo del cliente**, así que un precio o una fuga del canary ya habría llegado al usuario cuando L4 lo detecta sobre la respuesta completa.
+
+Decisión: el backend acumula el texto del modelo y emite **un solo `message.delta`** con la respuesta ya revisada. Se pierde la escritura token a token; se gana que nada sin filtrar llegue nunca al navegador.
+
+La sensación de tiempo real se mantiene con lo que sí se transmite en vivo: `tool.started` y `tool.finished` (chips de actividad), `lead.updated`, `hitl.confirmation_required` y `guardrail.triggered`. El contrato del evento no cambia, así que un cliente que maneje varios deltas sigue funcionando.
+
+Alternativa descartada: transmitir en crudo y emitir un evento de reemplazo al detectar la fuga. Se descartó porque el texto inseguro llega igual a la pantalla, aunque sea un instante, y con el canary eso ya es la fuga que se quería evitar.
 
 ## 3. Errores HTTP comunes
 

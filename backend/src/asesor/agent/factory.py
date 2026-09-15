@@ -6,12 +6,17 @@ from google.adk.apps import App
 from google.adk.apps._configs import ResumabilityConfig
 from google.adk.apps.app import EventsCompactionConfig
 from google.adk.models.base_llm import BaseLlm
+from google.adk.plugins.base_plugin import BasePlugin
 
+from asesor.agent.guardrails.faults import FaultInjectionPlugin
+from asesor.agent.guardrails.plugin import GuardrailPlugin
 from asesor.agent.instruction import render_instruction
 from asesor.agent.state import read_dialog_state
 from asesor.agent.tools.handoff_tools import make_solicitar_contacto_humano
+from asesor.agent.tools.knowledge_tools import make_search_knowledge_base
 from asesor.agent.tools.lead_tools import make_guardar_lead
 from asesor.application.handoff_service import HandoffService
+from asesor.application.knowledge_service import KnowledgeService
 from asesor.application.lead_service import LeadService
 from asesor.config import Settings
 
@@ -23,6 +28,7 @@ def create_agent(
     settings: Settings,
     lead_service: LeadService,
     handoff_service: HandoffService,
+    knowledge_service: KnowledgeService,
     model: str | BaseLlm | None = None,
 ) -> Agent:
     async def instruction_provider(ctx: ReadonlyContext) -> str:
@@ -38,14 +44,25 @@ def create_agent(
         tools=[
             make_guardar_lead(lead_service),
             make_solicitar_contacto_humano(handoff_service),
+            make_search_knowledge_base(knowledge_service),
         ],
     )
+
+
+def create_plugins(settings: Settings) -> list[BasePlugin]:
+    plugins: list[BasePlugin] = [
+        GuardrailPlugin(settings.guardrail_canary_token, settings.max_tool_calls_per_turn)
+    ]
+    if settings.fault_injection_active:
+        plugins.append(FaultInjectionPlugin())
+    return plugins
 
 
 def create_adk_app(settings: Settings, agent: Agent) -> App:
     return App(
         name=APP_NAME,
         root_agent=agent,
+        plugins=create_plugins(settings),
         events_compaction_config=EventsCompactionConfig(
             token_threshold=settings.memory_compaction_token_threshold,
             event_retention_size=settings.memory_compaction_keep_recent,

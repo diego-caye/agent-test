@@ -7,6 +7,8 @@ from typing import Any
 
 from google.adk.events import Event
 
+from asesor.agent.guardrails.plugin import GUARDRAIL_STATE_KEY
+from asesor.agent.parts import visible_text
 from asesor.domain.enums import ToolStatus
 
 logger = logging.getLogger(__name__)
@@ -15,6 +17,7 @@ LEAD_TOOL_NAME = "guardar_lead"
 HANDOFF_TOOL_NAME = "solicitar_contacto_humano"
 CONFIRMATION_CALL_NAME = "adk_request_confirmation"
 UPSTREAM_ERROR_MESSAGE = "No pudimos generar la respuesta. Reintenta en unos segundos."
+EMPTY_REPLY_FALLBACK = "Disculpa, se me fue la idea 😅 ¿Me lo repites?"
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,21 +67,34 @@ def _confirmation_event(call: Any) -> SseEvent:
 
 
 def _text_of(event: Event) -> str:
-    if event.content is None or not event.content.parts:
-        return ""
-    return "".join(part.text or "" for part in event.content.parts)
+    return visible_text(event.content)
 
 
 async def translate(events: AsyncIterator[Event], trace_id: str) -> AsyncIterator[SseEvent]:
     metrics = TurnMetrics()
     tool_started_at: dict[str, float] = {}
-    streamed_any_delta = False
+    awaiting_confirmation = False
+    reported_error = False
+    # El texto del modelo se acumula en vez de reenviarse fragmento a fragmento:
+    # L4 solo puede juzgar la respuesta completa, y una vez transmitido un delta
+    # ya no hay forma de retirarlo del cliente (spec 07 §1).
+    buffered = ""
     last_text = ""
     last_event_id = ""
 
     async for event in events:
         metrics.observe(event)
         last_event_id = event.id or last_event_id
+
+        triggered = (event.custom_metadata or {}).get(GUARDRAIL_STATE_KEY)
+        if isinstance(triggered, dict):
+            # Lo que ya se hubiera acumulado queda descartado: la respuesta
+            # buena es la que sustituye el guardrail.
+            buffered = ""
+            yield SseEvent(
+                "guardrail.triggered",
+                {"layer": triggered.get("layer"), "category": triggered.get("category")},
+            )
 
         if event.error_code:
             # El detalle del proveedor puede traer endpoints, claves o trazas:
@@ -89,6 +105,7 @@ async def translate(events: AsyncIterator[Event], trace_id: str) -> AsyncIterato
                 event.error_message,
                 extra={"trace_id": trace_id},
             )
+            reported_error = True
             yield SseEvent(
                 "error",
                 {"code": event.error_code, "message": UPSTREAM_ERROR_MESSAGE, "retryable": True},
@@ -97,6 +114,7 @@ async def translate(events: AsyncIterator[Event], trace_id: str) -> AsyncIterato
 
         for call in event.get_function_calls():
             if call.name == CONFIRMATION_CALL_NAME:
+                awaiting_confirmation = True
                 yield _confirmation_event(call)
                 continue
             tool_started_at[call.name or ""] = time.perf_counter()
@@ -137,13 +155,19 @@ async def translate(events: AsyncIterator[Event], trace_id: str) -> AsyncIterato
         text = _text_of(event)
         if text:
             if event.partial:
-                streamed_any_delta = True
-                yield SseEvent("message.delta", {"delta": text})
+                buffered += text
             else:
+                # La respuesta no parcial ya pasó por L4, así que es la que vale.
                 last_text = text
 
-    if not streamed_any_delta and last_text:
-        yield SseEvent("message.delta", {"delta": last_text})
+    final_text = last_text or buffered
+    if final_text:
+        yield SseEvent("message.delta", {"delta": final_text})
+    elif not (awaiting_confirmation or reported_error):
+        # Un turno sin texto visible deja una burbuja vacía. Pasa cuando el
+        # modelo solo emite razonamiento: se ha visto con Gemma 4 vía Ollama.
+        logger.warning("turno sin texto visible", extra={"trace_id": trace_id})
+        yield SseEvent("message.delta", {"delta": EMPTY_REPLY_FALLBACK})
 
     yield SseEvent(
         "message.completed",

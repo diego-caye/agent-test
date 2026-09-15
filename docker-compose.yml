@@ -25,6 +25,11 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-asesor}:${POSTGRES_PASSWORD:-asesor}@db:5432/${POSTGRES_DB:-asesor}
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:5173}
+      # En .env apunta a localhost, que es lo que usan los scripts del host;
+      # desde el contenedor hay que salir al host.
+      OLLAMA_API_BASE: ${OLLAMA_API_BASE_CONTAINER:-http://host.docker.internal:11434}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:

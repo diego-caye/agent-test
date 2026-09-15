@@ -1,9 +1,12 @@
 from datetime import datetime
 from uuid import UUID
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import BigInteger, Boolean, DateTime, Index, String, Text, func, text
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+from asesor.domain.knowledge import EMBEDDING_DIMENSIONS
 
 
 class Base(DeclarativeBase):
@@ -52,5 +55,28 @@ class HandoffRow(Base):
             "session_id",
             unique=True,
             postgresql_where=text("status = 'OPEN'"),
+        ),
+    )
+
+
+class KbChunkRow(Base):
+    __tablename__ = "kb_chunks"
+
+    chunk_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    title: Mapped[str] = mapped_column(String(160))
+    categoria: Mapped[str] = mapped_column(String(16), index=True)
+    source: Mapped[str] = mapped_column(String(160))
+    content: Mapped[str] = mapped_column(Text)
+    content_hash: Mapped[str] = mapped_column(String(64))
+    embedding_model: Mapped[str] = mapped_column(String(64), index=True)
+    embedding: Mapped[list[float]] = mapped_column(Vector(EMBEDDING_DIMENSIONS))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        Index(
+            "ix_kb_chunks_embedding_hnsw",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_ops={"embedding": "vector_cosine_ops"},
         ),
     )
