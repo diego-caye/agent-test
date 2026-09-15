@@ -1,0 +1,86 @@
+# 02 · Contrato de API
+
+Base path: `/api/v1`. Auth de usuario: header `X-User-Id` (UUID anónimo generado por el frontend, spec 06). Auth admin: header `Authorization: Bearer <ADMIN_TOKEN>` en endpoints marcados `(admin)`. CORS restringido al origen del frontend (`FRONTEND_ORIGIN`). Errores HTTP: cuerpo `{code, message, retryable}`.
+
+## 1. Endpoints
+
+### `POST /api/v1/sessions`
+Crea una sesión ADK para el `user_id` del header.
+- Body: `{}` (opcional `{"label": str}` a futuro, no en P0)
+- 200: `{"session_id": str}`
+- 401 si falta `X-User-Id`
+
+### `GET /api/v1/sessions`
+Lista sesiones del usuario del header, más recientes primero.
+- 200: `[{"session_id", "created_at", "last_message_at", "etapa"}]`
+
+### `GET /api/v1/sessions/{id}/messages`
+Historial de una sesión.
+- 200: `[{"role": "user"|"agent", "content", "created_at"}]`
+- 404 si la sesión no existe o no pertenece al `user_id` del header
+
+### `GET /api/v1/sessions/{id}/lead`
+Ficha actual del lead asociado al usuario dueño de la sesión.
+- 200: `{"lead": {...campos de guardar_lead...} | null, "etapa": str, "solo_mirando": bool}`
+- 404 si la sesión no existe o no pertenece al `user_id`
+
+### `POST /api/v1/chat/stream` (SSE)
+Envía un mensaje y transmite la respuesta en streaming.
+- Body: `{"session_id": str, "message": str (1–2000)}`
+- 404 si la sesión no pertenece al `user_id` del header
+- Respuesta: `text/event-stream`, eventos definidos en §2
+- Si hay un fault injection activo (`X-Debug-Fault`, solo `APP_ENV=dev` y `ENABLE_FAULT_INJECTION=true`), fuerza el camino de error correspondiente (spec 07)
+
+### `POST /api/v1/chat/confirmations` (SSE)
+Responde una confirmación HITL pendiente y reanuda el stream del turno.
+- Body: `{"session_id": str, "confirmation_id": str, "approved": bool, "comment"?: str}`
+- Respuesta: `text/event-stream`, continúa la misma secuencia de eventos que `chat/stream`
+- 404 si `confirmation_id` no existe o ya fue resuelto
+
+### `POST /api/v1/feedback`
+- Body: `{"session_id": str, "trace_id": str, "score": 1 | -1, "comment"?: str (≤500)}`
+- 200: `{"ok": true}`
+- 404 si la sesión no pertenece al `user_id`
+
+### `GET /api/v1/handoffs?status=` (admin)
+- Query `status?: OPEN | IN_PROGRESS | CLOSED`
+- 200: `[{"id", "session_id", "user_id", "motivo", "resumen_requerimiento", "canal_preferido", "urgencia", "status", "created_at"}]`
+
+### `PATCH /api/v1/handoffs/{id}` (admin)
+- Body: `{"status": "IN_PROGRESS" | "CLOSED"}`
+- 200: handoff actualizado
+- 404 si no existe; 409 si la transición de estado no es válida (spec 03 §2)
+
+### `GET /healthz`
+- 200: `{"status": "ok"}` sin dependencias externas (liveness)
+
+### `GET /readyz`
+- 200: `{"status": "ok", "db": "ok", "llm": "ok"}` — verifica conexión a Postgres y que el provider LLM configurado responde a un ping barato
+- 503 si alguna dependencia falla, con el detalle en el cuerpo
+
+## 2. Eventos SSE (`chat/stream` y `chat/confirmations`)
+
+Formato `event: <nombre>\ndata: <json>\n\n`.
+
+| Evento | Payload | Cuándo |
+|---|---|---|
+| `message.delta` | `{"delta": str}` | Cada fragmento de texto del modelo |
+| `message.completed` | `{"message_id", "trace_id", "latency_ms", "tokens_in", "tokens_out", "model"}` | Fin del turno (éxito) |
+| `tool.started` | `{"name": str}` | Antes de ejecutar una tool |
+| `tool.finished` | `{"name", "status", "duration_ms"}` | Después de ejecutar una tool |
+| `lead.updated` | `{"lead": {...}, "etapa": str}` | Tras `guardar_lead` o cambio de etapa |
+| `hitl.confirmation_required` | `{"confirmation_id", "motivo", "resumen", "canal_preferido"}` | El agente propone `solicitar_contacto_humano` y espera confirmación |
+| `guardrail.triggered` | `{"layer": "L1"\|"L2"\|"L4", "category": str}` | Un guardrail bloqueó o modificó la respuesta |
+| `error` | `{"code", "message", "retryable": bool}` | Fallo de tool, modelo, RAG o DB (spec 07) |
+
+Un turno normal: `tool.started/finished`* → `message.delta`* → `lead.updated`? → `message.completed`. Un turno con HITL pendiente termina en `hitl.confirmation_required` sin `message.completed`; el stream se cierra y se reanuda con `POST /chat/confirmations`.
+
+## 3. Errores HTTP comunes
+
+| Code | HTTP | Cuándo |
+|---|---|---|
+| `UNAUTHORIZED` | 401 | Falta `X-User-Id` o `ADMIN_TOKEN` inválido |
+| `NOT_FOUND` | 404 | Recurso inexistente o no perteneciente al usuario |
+| `VALIDATION_ERROR` | 422 | Body inválido (FastAPI/Pydantic) |
+| `CONFLICT` | 409 | Transición de estado inválida (handoff) |
+| `UPSTREAM_UNAVAILABLE` | 503 | DB o LLM caídos (`retryable: true`) |
