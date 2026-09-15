@@ -65,14 +65,18 @@ Nota: no hay `LlmProvider` factory todavía — el modelo se pasa como string de
 
 ## F3 · `feature/hitl` · P0
 
-DoD: AT de HITL (AT-08, AT-09, AT-10).
+DoD: AT de HITL (AT-08, AT-09, AT-10). **Cumplido.**
 
-- [ ] Spike de confirmación nativa de tools ADK sobre SSE propio
-- [ ] `ADR-002-hitl.md`
-- [ ] Tool `solicitar_contacto_humano`
-- [ ] Tabla `handoffs` + transiciones
-- [ ] `POST /chat/confirmations`
-- [ ] `GET /handoffs`, `PATCH /handoffs/{id}` (admin)
+- [x] Spike de confirmación nativa de tools ADK sobre SSE propio — **funciona**, no hace falta fallback
+- [x] `ADR-002-hitl.md`
+- [x] Tool `solicitar_contacto_humano` con confirmación previa
+- [x] Tabla `handoffs` + transiciones `OPEN → IN_PROGRESS → CLOSED`
+- [x] `POST /chat/confirmations` (reanuda el stream)
+- [x] `GET /handoffs`, `PATCH /handoffs/{id}` (admin con `ADMIN_TOKEN`)
+
+Verificado el 2026-09-15: 58 tests en verde. AT-08 (test drive → confirmación → ticket + etapa `DERIVADO`), AT-09 (cancelar no crea nada y restaura la etapa previa), AT-10 (segundo pedido devuelve el mismo ticket con `ya_existia: true`), más 401 sin token admin, 409 en transición inválida y 404 en handoff inexistente.
+
+Hallazgo importante: el autogenerate de Alembic veía las tablas de ADK (`sessions`, `events`, `app_states`, `user_states`, `adk_internal_metadata`) como sobrantes y emitía `DROP TABLE`. `migrations/env.py` ahora filtra con `include_object` las tablas que no son nuestras.
 
 ## F4 · `feature/frontend` · P0
 
