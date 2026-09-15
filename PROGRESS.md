@@ -108,14 +108,35 @@ Nota sobre el umbral: `RAG_MIN_SCORE` vale 0.55 en producción, calibrado para u
 
 ## F6 · `feature/guardrails` · P0 (L2/L4 P1)
 
-DoD: AT de guardrails y fallos (AT-11 a AT-18).
+DoD: AT de guardrails y fallos (AT-11 a AT-18). **Cumplido salvo L2.**
 
-- [ ] L1 determinista
-- [ ] L3 (tools)
-- [ ] Fallbacks de tool/modelo/RAG/DB
-- [ ] Fault injection (`X-Debug-Fault`)
-- [ ] L2 clasificador (P1)
-- [ ] L4 salida (P1)
+- [x] L1 determinista: longitud, normalización Unicode, invisibles, patrones ES/EN de inyección
+- [x] L3: tope de tool calls por turno (la validación Pydantic y los ids desde `ToolContext` ya venían de F2/F3)
+- [x] L4 salida: fuga del canary y precios/cuotas/stock → mensaje seguro
+- [x] Fallbacks de tool, modelo (backoff + respaldo), RAG y DB
+- [x] Fault injection (`X-Debug-Fault`), solo en dev
+- [ ] L2 clasificador (P1) — **no implementado**; L1 + L4 cubren los AT del reto
+
+Verificado el 2026-09-15: 125 tests en verde, mypy strict limpio (83 archivos), ruff limpio. AT-11 a AT-18 cubiertos, incluidos el fallback por 429 y los dos casos de L4.
+
+**Cambio de contrato (spec 02 §4):** el texto ya no se transmite token a token. L4 necesita ver la respuesta completa antes de que salga, y un delta transmitido no se puede retirar del cliente. El backend acumula y emite un solo `message.delta` ya filtrado. Los chips de tools, la ficha y la tarjeta HITL siguen llegando en vivo. **Pendiente al mergear F4:** actualizar `docs/ui.md`, que todavía describe la escritura token a token.
+
+Hallazgo: `FaultInjectionPlugin` no puede inyectar fallos del modelo, porque ADK captura las excepciones de los plugins y `ResilientLlm` nunca vería el 429. Se inyectan dentro de `ResilientLlm` vía un contextvar por request.
+
+## F8 (adelantada) · modelos locales · P2 → hecha en F6
+
+Adelantada a pedido del humano: sin `GOOGLE_API_KEY`, era lo que desbloqueaba verificar F4, la ingesta real y la calibración del umbral de RAG.
+
+- [x] `ADR-003-modelos-locales.md` con los hallazgos de integración
+- [x] Adaptadores: `LiteLlm` con `ollama_chat/` para el agente, `OllamaEmbeddings` para la KB
+- [x] `google-adk[extensions]` (LiteLLM no viene en la instalación base)
+- [x] `docker-compose.local-llm.yml` + `docker-compose.gpu.yml`
+- [x] `.env.example` con los dos perfiles intercambiables
+- [x] Validación del prefijo `ollama_chat/` y de `num_ctx` explícito en `Settings`
+- [x] KB re-ingerida con `embeddinggemma` y `RAG_MIN_SCORE` calibrado a 0.42
+- [x] Conversación real verificada: saludo, captura de lead, RAG, HITL, guardrails y precios
+
+Medido en una RTX 5080: 1,4–2,2 s por turno conversacional, 12–18 s con tool + RAG, 20–40 s la primera llamada (carga del modelo).
 
 ## F7 · `feature/feedback-evals` · P1
 
