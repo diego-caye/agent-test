@@ -147,6 +147,13 @@ services:
   # que AGENT_MODEL/GUARDRAIL_MODEL/FALLBACK_MODEL/EMBEDDINGS_MODEL esperan
   # encontrar (ver .env.example): un tag suelto podría resolver a una
   # variante distinta a la que el resto de la app tiene configurada.
+  #
+  # OLLAMA_EXTRA_MODELS (opcional, en .env): modelos de más para el selector,
+  # separados por espacio, p. ej. "mistral:7b llama3.1:8b". No hace falta
+  # tocar este archivo ni MODEL_CHOICES para que aparezcan: el backend los
+  # descubre solos contra /api/tags al arrancar (infrastructure/llm/
+  # ollama_discovery.py) — esto solo los deja *pulled* para quien clone el
+  # repo y use este perfil, igual que los cuatro de arriba.
   ollama-pull:
     profiles: ["local-llm"]
     image: ollama/ollama:0.34.0
@@ -155,6 +162,7 @@ services:
         condition: service_healthy
     environment:
       OLLAMA_HOST: http://ollama:11434
+      OLLAMA_EXTRA_MODELS: ${OLLAMA_EXTRA_MODELS:-}
     volumes:
       - ollama-models:/root/.ollama
     entrypoint: ["/bin/sh", "-c"]
@@ -162,7 +170,8 @@ services:
       "ollama pull ${OLLAMA_AGENT_MODEL:-gemma4:12b} &&
        ollama pull ${OLLAMA_GUARDRAIL_MODEL:-qwen3:4b-instruct} &&
        ollama pull ${OLLAMA_FALLBACK_MODEL:-llama3.2:3b} &&
-       ollama pull ${OLLAMA_EMBEDDINGS_MODEL:-embeddinggemma:300m}"
+       ollama pull ${OLLAMA_EMBEDDINGS_MODEL:-embeddinggemma:300m} &&
+       for m in $$OLLAMA_EXTRA_MODELS; do ollama pull \"$$m\" || exit 1; done"
     restart: "no"
 
 volumes:

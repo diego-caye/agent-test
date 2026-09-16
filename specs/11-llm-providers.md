@@ -34,6 +34,12 @@ Ningún modelo se hardcodea: `AGENT_MODEL`, `GUARDRAIL_MODEL`, `EVAL_MODEL`, `FA
 - Cada opción descubierta lleva `supports_tools` y `supports_thinking`, tomados literalmente de `capabilities` (`"tools"`, `"thinking"`). Esto no es solo informativo para la interfaz (`ModelOption.supports_*`, badges en el selector): `build_base_model` solo manda el parámetro `think` a LiteLLM cuando la opción elegida lo soporta, en vez de asumirlo siempre para el modelo principal como antes — mandarlo a un modelo sin esa capacidad responde 400 "does not support thinking" (ADR-003).
 - El modelo por defecto del selector es el que coincide con `AGENT_MODEL`, se haya declarado a mano o descubierto — no "el primero de la lista", que con descubrimiento dinámico depende del orden en que Ollama lo reporte.
 - Si `OLLAMA_API_BASE` no está configurado, o Ollama no responde en el arranque, la parte de Ollama del catálogo queda vacía (log de aviso, no falla el arranque del backend).
+- El descubrimiento corre **una vez, al arrancar** el backend, no en cada request a `/api/v1/models`: pullear un modelo nuevo mientras el backend ya está corriendo no lo hace aparecer solo, hace falta reiniciarlo (`docker compose restart backend`) para que vuelva a consultar `/api/tags`.
+
+**Agregar un modelo local nuevo — dos caminos distintos, no confundirlos:**
+
+1. **Ollama nativo** (el que usa `OLLAMA_API_BASE=http://localhost:11434` de `.env.example` por defecto, y lo que corre esta máquina de desarrollo): `ollama pull <modelo>:<tag>` en el host, después `docker compose restart backend`. No toca ningún archivo del repo — es solo para *esta* instalación.
+2. **Ollama dentro de Docker** (perfil `local-llm`, para quien clone el repo sin un Ollama propio): el modelo tiene que quedar *pulled* dentro del volumen `ollama-models` para que esté ahí la próxima vez que alguien levante el perfil. Se agrega a `OLLAMA_EXTRA_MODELS` en `.env` (lista separada por espacio, p. ej. `mistral:7b llama3.1:8b`) — el job `ollama-pull` de `docker-compose.yml` los baja junto con los cuatro por defecto. En ningún caso hace falta tocar `MODEL_CHOICES` ni `docker-compose.yml`: el descubrimiento (punto anterior) hace el resto.
 
 ## 4. Puerto `Embeddings`
 
