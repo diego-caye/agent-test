@@ -127,8 +127,12 @@ Banda sobre el campo de entrada, borde `--destructive`. Texto que dice qué pas�
 ### Panel dev
 Ficha del lead campo por campo (los vacíos en `--muted-foreground` con un guion), etapa como insignia, y del último turno: latencia en ms, tokens in/out y link a la traza si hay `LANGFUSE_PROJECT_ID`. El selector de fault injection se añade en F6, junto con la funcionalidad que lo respalda.
 
-### Botón "Nueva conversación"
-Deshabilitado mientras la creación está en vuelo, y la propia llamada devuelve la promesa ya en curso en vez de disparar una nueva: varios clics seguidos (o un doble clic accidental) antes de que vuelva la respuesta del primero creaban una conversación por clic.
+### Rutas y creación diferida de la sesión
+Cada conversación vive en su propia URL, `/c/:id`, navegable de verdad: se puede recargar, pegar en otra pestaña o abrir con Ctrl/Cmd+clic sin perder el lugar. `/` es el borrador — la conversación todavía sin crear en el backend.
+
+El botón "Nueva conversación" solo vuelve al borrador (`/`) y limpia el estado local; no llama a la API. La sesión se crea recién cuando se envía el primer mensaje de verdad, así que un clic repetido en el botón no dejaba una fila vacía por clic — ni tampoco al recargar la página con el borrador sin usar, que era la causa real de la acumulación de "Conversación nueva" en la barra lateral (dos correcciones previas habían tapado sólo dos síntomas del mismo problema: los clics simultáneos y los clics normales repetidos, pero no la creación anticipada en sí).
+
+Al entrar directo a `/c/:id` (un link, un refresh, atrás/adelante del navegador) se carga esa conversación; si el `id` no existe o no es de este usuario, se cae al borrador en vez de dejar la pantalla colgada.
 
 ## 6. Accesibilidad y calidad
 

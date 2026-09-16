@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 
 import { StreamIdleTimeoutError, api, sendConfirmation, sendMessage } from '../../api/client'
+import { navigate, sessionIdFromPath, sessionPath } from '../../lib/route'
 import type { ModelOption, ServerEvent, SessionSummary } from '../../api/types'
 import { type Message, chatReducer, initialChatState } from './reducer'
 
@@ -31,10 +32,20 @@ function readStoredModel(): string | null {
 export function useChat() {
   const [state, dispatch] = useReducer(chatReducer, initialChatState)
   const [sessions, setSessions] = useState<SessionSummary[]>([])
-  const [sessionId, setSessionId] = useState<string | null>(null)
+  // La URL es la fuente de verdad de qué conversación se ve, no un estado
+  // aparte: así "/" es siempre el borrador sin crear y "/c/:id" es siempre
+  // navegable, se puede recargar o pegar en otra pestaña sin perder el lugar.
+  const [sessionId, setSessionIdState] = useState<string | null>(() =>
+    sessionIdFromPath(window.location.pathname),
+  )
   const [models, setModels] = useState<ModelOption[]>([])
   const [modelId, setModelIdState] = useState<string | null>(readStoredModel)
   const abortRef = useRef<AbortController | null>(null)
+
+  const setSessionId = useCallback((id: string | null) => {
+    setSessionIdState(id)
+    navigate(id ? sessionPath(id) : '/')
+  }, [])
 
   const setModelId = useCallback((id: string) => {
     setModelIdState(id)
@@ -51,6 +62,26 @@ export function useChat() {
     } catch {
       // La lista es accesoria: si falla, el chat sigue usable.
     }
+  }, [])
+
+  // Separado de openSession() para que tanto un clic en la barra lateral como
+  // cargar la app directamente en /c/:id (un link, un refresh, atrás/adelante
+  // del navegador) puedan reusar la misma carga de mensajes y ficha.
+  const loadSessionData = useCallback(async (id: string) => {
+    const [messages, lead] = await Promise.all([api.listMessages(id), api.getLead(id)])
+    dispatch({
+      type: 'load',
+      messages: messages.map(
+        (message, index): Message => ({
+          id: `stored-${index}`,
+          role: message.role === 'user' ? 'user' : 'agent',
+          content: message.content,
+          streaming: false,
+        }),
+      ),
+      lead: lead.lead,
+      etapa: lead.etapa as never,
+    })
   }, [])
 
   const consume = useCallback(
@@ -74,33 +105,28 @@ export function useChat() {
     [dispatch],
   )
 
-  // Se guarda la promesa en curso, no solo un booleano: varios clics en
-  // "Nueva conversación" antes del primer re-render caían todos dentro de la
-  // ventana en la que un estado `creating` todavía valía false, y cada uno
-  // creaba su propia sesión. Devolver la misma promesa a todos los que llegan
-  // mientras ya hay una creación en vuelo evita la duplicación sin ignorar el
-  // clic silenciosamente.
+  // Se guarda la promesa en curso, no solo un booleano: varios clics antes
+  // del primer re-render caían todos dentro de la ventana en la que un
+  // estado `creating` todavía valía false, y cada uno creaba su propia
+  // sesión. Devolver la misma promesa a todos los que llegan mientras ya hay
+  // una creación en vuelo evita la duplicación sin ignorar el clic.
   const creatingSessionRef = useRef<Promise<string> | null>(null)
   const [creatingSession, setCreatingSession] = useState(false)
 
+  // Crea la sesión en el backend. A propósito NO es lo que dispara el botón
+  // "Nueva conversación": eso llevaría a crear una fila real (y vacía) por
+  // cada clic, incluida cada vez que la página se recarga con el borrador
+  // sin usar. Solo send() la llama, y solo cuando de verdad hay un primer
+  // mensaje que enviar — así una conversación entra a la lista cuando existe
+  // algo que mostrar en ella, no antes.
   const createSession = useCallback(async () => {
     if (creatingSessionRef.current) return creatingSessionRef.current
-
-    // Ya se está en una conversación vacía: crear otra sería indistinguible
-    // para quien usa la app y solo deja "Conversación nueva" repetidas en la
-    // barra lateral. Esto es lo que de verdad pedía el reporte: el guard de
-    // arriba solo evita los clics simultáneos, pero varios clics normales
-    // (cada uno completo antes del siguiente) seguían abriendo una sesión
-    // por clic mientras la actual siguiera sin usarse.
-    if (sessionId && state.messages.length === 0) return sessionId
 
     const promise = (async () => {
       setCreatingSession(true)
       try {
-        abortRef.current?.abort()
         const { session_id } = await api.createSession()
         setSessionId(session_id)
-        dispatch({ type: 'reset' })
         await refreshSessions()
         return session_id
       } finally {
@@ -111,27 +137,26 @@ export function useChat() {
 
     creatingSessionRef.current = promise
     return promise
-  }, [refreshSessions, sessionId, state.messages.length])
+  }, [refreshSessions, setSessionId])
 
-  const openSession = useCallback(async (id: string) => {
+  const openSession = useCallback(
+    async (id: string) => {
+      abortRef.current?.abort()
+      setSessionId(id)
+      await loadSessionData(id)
+    },
+    [setSessionId, loadSessionData],
+  )
+
+  // Lo que de verdad hace el botón "Nueva conversación": vuelve al borrador
+  // sin tocar el backend. Solo si se escribe algo ahí se crea una sesión de
+  // verdad (ver createSession). Es puramente local, así que no hay carrera
+  // posible por clics repetidos: no queda nada en vuelo que deba compartirse.
+  const startNewConversation = useCallback(() => {
     abortRef.current?.abort()
-    setSessionId(id)
-
-    const [messages, lead] = await Promise.all([api.listMessages(id), api.getLead(id)])
-    dispatch({
-      type: 'load',
-      messages: messages.map(
-        (message, index): Message => ({
-          id: `stored-${index}`,
-          role: message.role === 'user' ? 'user' : 'agent',
-          content: message.content,
-          streaming: false,
-        }),
-      ),
-      lead: lead.lead,
-      etapa: lead.etapa as never,
-    })
-  }, [])
+    setSessionId(null)
+    dispatch({ type: 'reset' })
+  }, [setSessionId])
 
   const send = useCallback(
     async (text: string) => {
@@ -173,15 +198,49 @@ export function useChat() {
 
       await refreshSessions()
     },
-    [sessionId, refreshSessions],
+    [sessionId, refreshSessions, setSessionId],
   )
 
   const retry = useCallback(async () => {
     if (state.lastUserMessage) await send(state.lastUserMessage)
   }, [state.lastUserMessage, send])
 
+  // Vuelve a leer la URL al usar atrás/adelante del navegador: pushState (en
+  // navigate(), lib/route.ts) no dispara 'popstate' por sí solo, pero un
+  // cambio real de historial sí, y es la única forma en que la URL cambia
+  // sin pasar por nuestros propios setSessionId/startNewConversation.
+  useEffect(() => {
+    function onPopState() {
+      const id = sessionIdFromPath(window.location.pathname)
+      setSessionIdState(id)
+      if (id) {
+        loadSessionData(id).catch(() => {
+          navigate('/')
+          setSessionIdState(null)
+          dispatch({ type: 'reset' })
+        })
+      } else {
+        dispatch({ type: 'reset' })
+      }
+    }
+
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [loadSessionData])
+
   useEffect(() => {
     void refreshSessions()
+
+    // Si se entra directo a /c/:id (un link, un refresh, una pestaña nueva),
+    // se carga esa conversación en vez de arrancar en el borrador vacío.
+    if (sessionId) {
+      loadSessionData(sessionId).catch(() => {
+        // No existe o no es de este usuario: no tiene sentido dejar la URL
+        // apuntando a algo que nunca va a cargar.
+        setSessionId(null)
+        dispatch({ type: 'reset' })
+      })
+    }
 
     void api
       .listModels()
@@ -197,6 +256,9 @@ export function useChat() {
       .catch(() => setModels([]))
 
     return () => abortRef.current?.abort()
+    // Solo debe correr al montar: sessionId aquí es el de la URL inicial, no
+    // algo a lo que este efecto deba reaccionar en cada cambio.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshSessions])
 
   return {
@@ -209,7 +271,7 @@ export function useChat() {
     setModelId,
     send,
     retry,
-    createSession,
+    startNewConversation,
     openSession,
     removeSession,
     answerConfirmation,

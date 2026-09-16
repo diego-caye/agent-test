@@ -1,3 +1,4 @@
+import type { MouseEvent } from 'react'
 import { MessageSquarePlus, Trash2 } from 'lucide-react'
 
 import {
@@ -15,29 +16,22 @@ import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
 import type { SessionSummary } from '../../api/types'
+import { sessionPath } from '../../lib/route'
 import { ETAPA_LABEL } from '../chat/labels'
 
 type Props = {
   sessions: SessionSummary[]
   activeId: string | null
-  creating: boolean
   onSelect: (sessionId: string) => void
   onCreate: () => void
   onDelete: (sessionId: string) => void
 }
 
-export function Sidebar({ sessions, activeId, creating, onSelect, onCreate, onDelete }: Props) {
+export function Sidebar({ sessions, activeId, onSelect, onCreate, onDelete }: Props) {
   return (
     <nav className="bg-sidebar border-sidebar-border hidden w-60 shrink-0 flex-col border-r md:flex">
       <div className="p-3">
-        {/* disabled mientras se crea: sin esto, varios clics antes de que
-            llegue la respuesta del primero abrían una conversación por clic. */}
-        <Button
-          type="button"
-          onClick={onCreate}
-          disabled={creating}
-          className="h-10 w-full font-semibold"
-        >
+        <Button type="button" onClick={onCreate} className="h-10 w-full font-semibold">
           <MessageSquarePlus aria-hidden="true" />
           Nueva conversación
         </Button>
@@ -54,14 +48,26 @@ export function Sidebar({ sessions, activeId, creating, onSelect, onCreate, onDe
           {sessions.map((session) => {
             const isActive = session.session_id === activeId
 
+            // Un <a href> real, no un <button>: así se puede abrir en pestaña
+            // nueva con clic central o Ctrl/Cmd+clic, copiar el enlace con
+            // clic derecho, o simplemente pegar la URL en otra pestaña. El
+            // clic normal se intercepta para navegar sin recargar la página.
+            function handleClick(event: MouseEvent<HTMLAnchorElement>) {
+              const usesModifier =
+                event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey
+              if (usesModifier) return
+              event.preventDefault()
+              onSelect(session.session_id)
+            }
+
             return (
               <li key={session.session_id} className="group relative">
-                <button
-                  type="button"
-                  onClick={() => onSelect(session.session_id)}
+                <a
+                  href={sessionPath(session.session_id)}
+                  onClick={handleClick}
                   aria-current={isActive ? 'true' : undefined}
                   className={[
-                    'w-full rounded-lg py-2 pr-9 pl-3 text-left transition-colors',
+                    'block w-full rounded-lg py-2 pr-9 pl-3 text-left transition-colors',
                     isActive ? 'bg-sidebar-accent' : 'hover:bg-sidebar-accent/60',
                   ].join(' ')}
                 >
@@ -80,7 +86,7 @@ export function Sidebar({ sessions, activeId, creating, onSelect, onCreate, onDe
                     {' · '}
                     {ETAPA_LABEL[session.etapa] ?? session.etapa}
                   </span>
-                </button>
+                </a>
 
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
