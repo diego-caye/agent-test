@@ -70,4 +70,4 @@
 
 ## 7. Infraestructura
 
-`docker-compose.yml` (db, backend, frontend) + `docker-compose.local-llm.yml` (Ollama) + `docker-compose.gpu.yml` (override GPU). `Makefile` con targets `up`, `down`, `lint`, `typecheck`, `test`, `ingest-kb`, `migrate`. Ver spec 11 para el perfil de modelos locales.
+Un único `docker-compose.yml` (db, backend, frontend; Ollama bajo el perfil opcional `local-llm`, que asume GPU NVIDIA). `backend` y `frontend` montan el código fuente y recargan en caliente, así que `--build` solo hace falta cuando cambian las dependencias. `Makefile` con targets `up`, `up-llm`, `rebuild`, `down`, `lint`, `typecheck`, `test`, `ingest-kb`, `migrate`. Ver spec 11 para el perfil de modelos locales.

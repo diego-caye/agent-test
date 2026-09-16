@@ -14,6 +14,8 @@ export type Etapa =
 
 export type ToolName = 'guardar_lead' | 'solicitar_contacto_humano' | 'search_knowledge_base'
 
+export type ModelOption = components['schemas']['ModelOption']
+
 /**
  * Eventos SSE de specs/02-api-contract.md §2. No salen del OpenAPI porque el
  * stream no se describe ahí; este tipo es el contrato con el backend.

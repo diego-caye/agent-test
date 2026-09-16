@@ -1,6 +1,12 @@
 # Spec de UI · Asesor automotriz
 
-Plan de diseño previo al código (F4). El objetivo es que se lea como una herramienta de asesoría con la que un peruano conversaría con confianza, no como una demo genérica de IA.
+Plan de diseño previo al código (F4), actualizado en F6 al adoptar shadcn/ui. El objetivo es que se lea como una herramienta de asesoría con la que un peruano conversaría con confianza, no como una demo genérica de IA.
+
+## 0. Base de componentes
+
+Los componentes vienen de **shadcn/ui** (preset `radix-nova`, primitivas de Radix, iconos de Lucide), instalados en `src/components/ui/` y versionados con el repo: no es una dependencia opaca, es código propio que se puede leer y modificar. Lo que aporta y no íbamos a rehacer bien a mano es el comportamiento accesible de los overlays — el `Select` del selector de modelo y el `AlertDialog` de borrado necesitan foco atrapado, cierre con Escape, navegación con teclado y `aria-*` correctos.
+
+La paleta de la sección 2 **no** se mantiene aparte: se expresa directamente en los tokens semánticos de shadcn (`--primary`, `--muted-foreground`, `--border`…), de modo que cualquier componente que se añada después salga ya con la identidad del producto. Tener dos sistemas de color conviviendo era la forma segura de que se desincronizaran.
 
 ## 1. Principios
 
@@ -20,27 +26,29 @@ Superficie azul noche, ligeramente desaturada hacia el azul, con un ámbar cáli
 
 | Token | Hex | Rol |
 |---|---|---|
-| `--surface` | `#12161F` | Fondo de la aplicación |
-| `--panel` | `#1A202C` | Sidebar, panel dev, burbuja del agente |
-| `--panel-raised` | `#222A38` | Campo de entrada, tarjeta HITL |
-| `--border` | `#2C3544` | Separadores y bordes de 1px |
-| `--text` | `#E7EAF0` | Texto principal |
-| `--text-muted` | `#94A0B4` | Metadatos, timestamps, chips |
-| `--accent` | `#E8A33D` | Botón primario, chips de tool, foco |
-| `--accent-ink` | `#1A1206` | Texto sobre ámbar |
-| `--accent-soft` | `#3B3020` | Fondo de chip de actividad |
-| `--user-bubble` | `#2A3547` | Burbuja del usuario |
-| `--success` | `#4FA87B` | Handoff confirmado |
-| `--danger` | `#D8695C` | Errores |
+| `--background` | `#12161F` | Fondo de la aplicación |
+| `--card` / `--sidebar` | `#1A202C` | Sidebar, panel dev, burbuja del agente |
+| `--popover` / `--secondary` | `#222A38` | Menú del selector, tarjeta HITL |
+| `--border` / `--input` | `#2C3544` | Separadores y bordes de 1px |
+| `--foreground` | `#E7EAF0` | Texto principal |
+| `--muted-foreground` | `#94A0B4` | Metadatos, timestamps, chips |
+| `--primary` / `--ring` | `#E8A33D` | Botón primario, punto de actividad, foco |
+| `--primary-foreground` | `#1A1206` | Texto sobre ámbar |
+| `--color-accent-soft` | `#3B3020` | Fondo de chip de actividad |
+| `--color-user-bubble` | `#2A3547` | Burbuja del usuario |
+| `--color-ok` | `#4FA87B` | Handoff confirmado |
+| `--destructive` | `#D8695C` | Errores y borrado |
 
-Contraste: `--text` sobre `--surface` ≈ 13:1 y `--text-muted` sobre `--panel` ≈ 5.1:1, ambos por encima de AA. El ámbar se usa como fondo con texto oscuro (`--accent-ink`), nunca como texto claro sobre oscuro en tamaño pequeño.
+Los tres con prefijo `--color-` son tonos propios del chat que shadcn no nombra; el resto son sus tokens semánticos con nuestros valores. La aplicación es solo oscura, así que `:root` ya lleva los valores oscuros y `.dark` repite los mismos para los componentes que consultan la clase.
+
+Contraste: `--foreground` sobre `--background` ≈ 13:1 y `--muted-foreground` sobre `--card` ≈ 5.1:1, ambos por encima de AA. El ámbar se usa como fondo con texto oscuro (`--primary-foreground`), nunca como texto claro sobre oscuro en tamaño pequeño.
 
 ## 3. Tipografía
 
-Una sola familia con stack del sistema, para que cargue instantáneo y se vea nativa en Windows, macOS y Android:
+Una sola familia, **Geist Variable**, servida desde el propio bundle (`@fontsource-variable/geist`) y no desde un CDN, para que no dependa de la red ni filtre visitas a terceros. Cae al stack del sistema si por lo que sea no carga:
 
 ```
-font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif
+font-family: "Geist Variable", "Segoe UI", system-ui, sans-serif
 ```
 
 | Rol | Tamaño / peso |
@@ -48,6 +56,7 @@ font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans
 | Nombre del agente en la cabecera | 15px / 600 |
 | Texto de conversación | 15px / 400, interlineado 1.55 |
 | Chips de actividad y metadatos | 12px / 500 |
+| Selector de modelo | 12px / 500 |
 | Etiquetas del panel dev | 11px / 500, `letter-spacing: .04em` |
 | Números del panel dev (latencia, tokens) | 12px / 500, tabular (`font-variant-numeric: tabular-nums`) para que no bailen al actualizarse |
 
@@ -73,7 +82,7 @@ Sin mayúsculas forzadas salvo en las etiquetas del panel dev, donde ayudan a se
    240px            flexible              280px
 ```
 
-- **Sidebar (240px).** Botón "Nueva conversación" y lista de sesiones con su etapa. Cada fila tiene un icono de papelera que aparece al pasar el cursor (y con foco de teclado); al pulsarlo, la fila ofrece "Borrar / No" en vez de abrir un diálogo modal, que para esta acción sería desproporcionado. Se colapsa bajo 900px a un botón en la cabecera.
+- **Sidebar (240px).** Botón "Nueva conversación" y lista de sesiones. Cada fila muestra el **título de la conversación** en la primera línea y fecha + etapa en la segunda; el título lo genera el modelo ligero en segundo plano a partir del primer mensaje, así que hasta que llega se lee "Conversación nueva". El icono de papelera aparece al pasar el cursor (y con foco de teclado) y abre un `AlertDialog` que aclara que se pierden los mensajes pero no la ficha del lead. Se colapsa bajo 900px a un botón en la cabecera.
 - **Panel de chat (flexible).** Cabecera fina con el nombre del agente y el estado de conexión; lista de mensajes; campo de entrada anclado abajo.
 - **Panel dev (280px, plegable).** Ficha del lead y etapa en vivo, latencia y tokens del último turno, link a la traza en Langfuse. Se pliega con un botón y su estado se recuerda en `localStorage`.
 
@@ -84,14 +93,14 @@ Bajo 900px el panel dev se oculta por completo y la sidebar pasa a un drawer. Ba
 ## 5. Componentes clave
 
 ### Burbuja de mensaje
-Agente a la izquierda sobre `--panel`, usuario a la derecha sobre `--user-bubble`. Radio 14px con la esquina del lado del hablante a 4px. Sin avatar: el alineamiento ya distingue quién habla.
+Agente a la izquierda sobre `--card`, usuario a la derecha sobre `--color-user-bubble`. Radio 14px con la esquina del lado del hablante a 4px. Sin avatar: el alineamiento ya distingue quién habla.
 
 **Sobre el streaming (revisado en F6).** El texto del agente llega en un solo evento, no token a token. No es una simplificación: el filtro de salida L4 necesita ver la respuesta completa antes de que salga, y un delta ya transmitido no se puede retirar del navegador — razonado en `specs/02-api-contract.md` §4. Lo que sí ocurre en vivo, y es de donde viene la sensación de que el asesor está trabajando, son los chips de actividad de las tools, la ficha del lead y la tarjeta HITL.
 
 **Indicador de escritura.** Como la burbuja del agente no existe hasta que llega la respuesta completa, entre el envío y la respuesta no habría nada en pantalla: con un modelo local en frío eso son decenas de segundos y la interfaz parece colgada. Tres puntos animados ocupan ese hueco desde el primer instante, y a los 8 segundos se añade una línea explicando que el modelo local está cargando. Respeta `prefers-reduced-motion`.
 
 ### Chip de actividad
-Línea propia, fondo `--accent-soft`, texto `--text-muted`, punto ámbar a la izquierda. Aparece al recibir `tool.started` y se resuelve al llegar `tool.finished`.
+Línea propia, fondo `--color-accent-soft`, texto `--muted-foreground`, punto ámbar a la izquierda. Aparece al recibir `tool.started` y se resuelve al llegar `tool.finished`.
 
 | Tool | Texto |
 |---|---|
@@ -100,19 +109,26 @@ Línea propia, fondo `--accent-soft`, texto `--text-muted`, punto ámbar a la iz
 | `solicitar_contacto_humano` | "Preparando tu solicitud…" |
 
 ### Tarjeta HITL
-Se dispara con `hitl.confirmation_required`. Fondo `--panel-raised`, borde ámbar de 1px. Muestra motivo en lenguaje natural (no el enum), el resumen del requerimiento y el canal si se conoce. Dos botones: **"Confirmar solicitud"** (ámbar, primario) y **"Ahora no"** (fantasma). Al confirmar, la tarjeta se reemplaza por una línea de éxito en `--success`: "Solicitud enviada · TICK-00042".
+Se dispara con `hitl.confirmation_required`. Fondo elevado, borde ámbar de 1px. Muestra motivo en lenguaje natural (no el enum), el resumen del requerimiento y el canal si se conoce. Dos botones: **"Confirmar solicitud"** (ámbar, primario) y **"Ahora no"** (fantasma). Al confirmar, la tarjeta se reemplaza por una línea de éxito en `--success`: "Solicitud enviada · TICK-00042".
 
 Motivos en lenguaje natural: `TEST_DRIVE` → "agendar un test drive"; `COTIZACION_FORMAL` → "una cotización formal"; `COMPRA_INMEDIATA` → "avanzar con la compra"; `DISCONFORMIDAD` → "atender un reclamo"; `FUERA_DE_ALCANCE` → "hablar con un especialista".
 
+### Selector de modelo
+En la cabecera, a la izquierda del botón del panel dev. Un `Select` que lista el catálogo de `GET /api/v1/models` con una insignia por proveedor ("local" o "API"). El modelo elegido se manda en cada turno y se recuerda en `localStorage`; **no** se ata a la conversación, de modo que se puede cambiar de modelo a media charla sin perder el historial ni la ficha del lead — es la forma más directa de enseñar la misma conversación con Gemma 4, Qwen3 y Gemini. Se oculta si solo hay una opción configurada y se deshabilita mientras un turno está en vuelo. Las opciones cuyo proveedor no está configurado (Gemini sin API key) salen deshabilitadas con la nota "sin configurar" en vez de ocultarse, para que se vea qué hay y por qué no se puede usar.
+
+### Título de la conversación
+Lo genera `GUARDRAIL_MODEL` (el modelo pequeño) a partir del primer mensaje del usuario, en segundo plano y después del turno, para no sumarle latencia a la respuesta. De tres a seis palabras, máximo 48 caracteres. Si el modelo devuelve algo inservible se usa el propio mensaje recortado: una conversación siempre tiene que poder distinguirse de las demás en la lista.
+
 ### Error
-Banda sobre el campo de entrada, borde `--danger`. Texto que dice qué pasó y qué hacer ("No pudimos conectar con el asesor. Reintenta en unos segundos.") y un botón "Reintentar" que reenvía el último mensaje.
+Banda sobre el campo de entrada, borde `--destructive`. Texto que dice qué pasó y qué hacer ("No pudimos conectar con el asesor. Reintenta en unos segundos.") y un botón "Reintentar" que reenvía el último mensaje.
 
 ### Panel dev
-Ficha del lead campo por campo (los vacíos en `--text-muted` con un guion), etapa como chip, y del último turno: latencia en ms, tokens in/out y link a la traza si hay `LANGFUSE_PROJECT_ID`. El selector de fault injection se añade en F6, junto con la funcionalidad que lo respalda.
+Ficha del lead campo por campo (los vacíos en `--muted-foreground` con un guion), etapa como insignia, y del último turno: latencia en ms, tokens in/out y link a la traza si hay `LANGFUSE_PROJECT_ID`. El selector de fault injection se añade en F6, junto con la funcionalidad que lo respalda.
 
 ## 6. Accesibilidad y calidad
 
-- Foco visible en todo elemento interactivo: anillo de 2px en `--accent` con 2px de separación. Nunca `outline: none` sin reemplazo.
+- Foco visible en todo elemento interactivo: anillo ámbar (`--ring`). Nunca `outline: none` sin reemplazo.
+- El campo de entrada es un `textarea`: Enter envía y Shift+Enter hace salto de línea, que es lo que ya se espera de un chat.
 - La lista de mensajes es `aria-live="polite"` para que un lector de pantalla anuncie las respuestas conforme llegan.
 - Los chips de actividad y el estado de conexión se anuncian con `role="status"`.
 - `prefers-reduced-motion`: desaparecen el parpadeo del cursor y las transiciones de entrada de burbuja.

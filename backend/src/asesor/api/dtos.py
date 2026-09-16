@@ -10,6 +10,7 @@ class CreateSessionResponse(BaseModel):
 
 
 class SessionSummary(BaseModel):
+    titulo: str | None = None
     session_id: str
     last_update_time: datetime
     etapa: str
@@ -42,6 +43,16 @@ class LeadResponse(BaseModel):
 class ChatRequest(BaseModel):
     session_id: str
     message: str = Field(min_length=1, max_length=2000)
+    model_id: str | None = None
+
+
+class ModelOption(BaseModel):
+    id: str
+    label: str
+    provider: str
+    model: str
+    available: bool
+    is_default: bool
 
 
 class ConfirmationRequest(BaseModel):
@@ -49,6 +60,9 @@ class ConfirmationRequest(BaseModel):
     confirmation_id: str
     approved: bool
     comment: str | None = Field(default=None, max_length=500)
+    # Reanudar con el mismo modelo que pidió la confirmación: cambiar a mitad
+    # de un turno pausado mezclaría dos modelos en la misma respuesta.
+    model_id: str | None = None
 
 
 class HandoffDto(BaseModel):

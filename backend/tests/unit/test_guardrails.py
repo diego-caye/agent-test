@@ -129,6 +129,22 @@ def test_l4_deja_pasar_asesoria_legitima(reply: str) -> None:
             "Déjame ver.\nYa tengo el dato.",
         ),
         ('solicitar_contacto_humano(motivo="TEST_DRIVE")', ""),
+        # Caso real de Gemma 4 visto en la interfaz: llaves en vez de paréntesis
+        # y un prefijo inventado, pegado al final del párrafo.
+        (
+            "He tomado nota de que te interesa una SUV.\n"
+            'llama:guardar_lead{tipo_vehiculo_interes:<|"|>SUV<|"|>,'
+            'nivel_interes:<|"|>MEDIO<|"|>}',
+            "He tomado nota de que te interesa una SUV.",
+        ),
+        (
+            "Claro que sí. guardar_lead{nombre: Diego} ¿Te ayudo con algo más?",
+            "Claro que sí. ¿Te ayudo con algo más?",
+        ),
+        (
+            "Un momento.\n<|tool|>:search_knowledge_base[query: suv]\nListo.",
+            "Un momento.\nListo.",
+        ),
     ],
 )
 def test_l4_quita_llamadas_a_tools_escritas_como_texto(respuesta: str, esperado: str) -> None:

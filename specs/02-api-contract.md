@@ -12,7 +12,8 @@ Crea una sesión ADK para el `user_id` del header.
 
 ### `GET /api/v1/sessions`
 Lista sesiones del usuario del header, más recientes primero.
-- 200: `[{"session_id", "created_at", "last_message_at", "etapa"}]`
+- 200: `[{"titulo": str | null, "session_id", "last_update_time", "etapa"}]`
+- `titulo` es un resumen de 3–6 palabras del primer mensaje, generado en segundo plano por `GUARDRAIL_MODEL` (el modelo ligero) y guardado en el estado de sesión bajo la clave `titulo`. Es `null` mientras no se haya generado: el frontend muestra "Conversación nueva". Nunca bloquea ni hace fallar el turno; si el modelo no da nada usable se cae al propio mensaje del usuario recortado a 48 caracteres.
 
 ### `DELETE /api/v1/sessions/{id}`
 Borra una conversación del usuario del header, con sus eventos.
@@ -32,16 +33,25 @@ Ficha actual del lead asociado al usuario dueño de la sesión.
 
 ### `POST /api/v1/chat/stream` (SSE)
 Envía un mensaje y transmite la respuesta en streaming.
-- Body: `{"session_id": str, "message": str (1–2000)}`
+- Body: `{"session_id": str, "message": str (1–2000), "model_id"?: str}`
+- `model_id` es un `id` del catálogo de `GET /api/v1/models`; si se omite, el primero del catálogo. El modelo se elige **por turno**, no por sesión: la conversación es la misma y el historial se conserva al cambiar, porque la sesión vive en `DatabaseSessionService` y no en el modelo. 400 `unknown_model` si el `id` no existe
 - 404 si la sesión no pertenece al `user_id` del header
 - Respuesta: `text/event-stream`, eventos definidos en §2
 - Si hay un fault injection activo (`X-Debug-Fault`, solo `APP_ENV=dev` y `ENABLE_FAULT_INJECTION=true`), fuerza el camino de error correspondiente (spec 07)
 
 ### `POST /api/v1/chat/confirmations` (SSE)
 Responde una confirmación HITL pendiente y reanuda el stream del turno.
-- Body: `{"session_id": str, "confirmation_id": str, "approved": bool, "comment"?: str}`
+- Body: `{"session_id": str, "confirmation_id": str, "approved": bool, "comment"?: str, "model_id"?: str}`
+- Conviene reanudar con el mismo `model_id` que pidió la confirmación: cambiarlo a mitad de un turno pausado mezcla dos modelos en una sola respuesta
 - Respuesta: `text/event-stream`, continúa la misma secuencia de eventos que `chat/stream`
 - 404 si `confirmation_id` no existe o ya fue resuelto
+
+### `GET /api/v1/models`
+Catálogo del selector de modelos, en el orden de `MODEL_CHOICES`.
+- 200: `[{"id", "label", "provider": "gemini"|"ollama", "model", "available": bool, "is_default": bool}]`
+- `available` es false cuando el proveedor de esa opción no está configurado (Gemini sin `GOOGLE_API_KEY`). La interfaz las muestra deshabilitadas en vez de ocultarlas, para que se vea qué hay y por qué no se puede usar
+- Sin `MODEL_CHOICES` el catálogo tiene una sola entrada, la de `AGENT_MODEL`, y el selector se oculta
+- No requiere `X-User-Id`: es configuración del despliegue, no del usuario
 
 ### `POST /api/v1/feedback`
 - Body: `{"session_id": str, "trace_id": str, "score": 1 | -1, "comment"?: str (≤500)}`

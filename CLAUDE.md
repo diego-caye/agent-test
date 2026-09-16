@@ -42,7 +42,7 @@ cd backend && uv run mypy                                          # typecheck
 cd backend && uv run pytest                                        # tests
 cd frontend && npm run typecheck && npm run build                  # frontend
 cd backend && uv run python scripts/ingest_kb.py                   # ingesta de la KB
-docker compose up -d --build                                       # make up
+docker compose up -d                                              # make up (recarga en caliente; --build solo si cambian dependencias)
 ```
 
 Puertos por defecto **8090** (backend), **5190** (frontend) y **5490** (Postgres), fuera de los habituales a propósito: es normal tener otros proyectos ocupando 8000, 5173 y 5432. Se cambian con `BACKEND_PORT`, `FRONTEND_PORT` y `POSTGRES_PORT`.

@@ -1,5 +1,11 @@
 import { createSseParser, toServerEvent } from './sse'
-import type { LeadResponse, MessageDto, ServerEvent, SessionSummary } from './types'
+import type {
+  LeadResponse,
+  MessageDto,
+  ModelOption,
+  ServerEvent,
+  SessionSummary,
+} from './types'
 
 const USER_ID_KEY = 'asesor.user_id'
 
@@ -37,6 +43,7 @@ export const api = {
   getLead: (sessionId: string) => request<LeadResponse>(`/api/v1/sessions/${sessionId}/lead`),
   deleteSession: (sessionId: string) =>
     request<void>(`/api/v1/sessions/${sessionId}`, { method: 'DELETE' }),
+  listModels: () => request<ModelOption[]>('/api/v1/models'),
 }
 
 async function* streamEvents(
@@ -73,20 +80,26 @@ async function* streamEvents(
 export function sendMessage(
   sessionId: string,
   message: string,
+  modelId: string | null,
   signal: AbortSignal,
 ): AsyncGenerator<ServerEvent> {
-  return streamEvents('/api/v1/chat/stream', { session_id: sessionId, message }, signal)
+  return streamEvents(
+    "/api/v1/chat/stream",
+    { session_id: sessionId, message, model_id: modelId },
+    signal,
+  )
 }
 
 export function sendConfirmation(
   sessionId: string,
   confirmationId: string,
   approved: boolean,
+  modelId: string | null,
   signal: AbortSignal,
 ): AsyncGenerator<ServerEvent> {
   return streamEvents(
     '/api/v1/chat/confirmations',
-    { session_id: sessionId, confirmation_id: confirmationId, approved },
+    { session_id: sessionId, confirmation_id: confirmationId, approved, model_id: modelId },
     signal,
   )
 }

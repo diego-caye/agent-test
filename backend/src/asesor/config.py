@@ -2,10 +2,18 @@ from enum import StrEnum
 from functools import lru_cache
 from typing import Self
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 OLLAMA_THINK_LEVELS = frozenset({"low", "medium", "high", "max"})
+
+DEFAULT_MODEL_ID = "default"
+
+
+class UnknownModelError(ValueError):
+    def __init__(self, model_id: str) -> None:
+        super().__init__(f"Modelo desconocido: {model_id}")
+        self.model_id = model_id
 
 
 class AppEnv(StrEnum):
@@ -22,6 +30,15 @@ class LlmProviderName(StrEnum):
 class EmbeddingsProviderName(StrEnum):
     GEMINI = "gemini"
     OLLAMA = "ollama"
+
+
+class ModelChoice(BaseModel):
+    """Una opción del selector de modelos de la interfaz."""
+
+    id: str
+    label: str
+    provider: LlmProviderName
+    model: str
 
 
 class Settings(BaseSettings):
@@ -84,6 +101,10 @@ class Settings(BaseSettings):
     eval_model: str
     fallback_model: str
 
+    # Catálogo del selector de modelos (JSON). Vacío = una sola opción, la de
+    # AGENT_MODEL, y el selector no se muestra.
+    model_choices: list[ModelChoice] = Field(default_factory=list)
+
     embeddings_provider: EmbeddingsProviderName = EmbeddingsProviderName.GEMINI
     embeddings_model: str
     rag_min_score: float = Field(default=0.55, ge=0.0, le=1.0)
@@ -113,6 +134,41 @@ class Settings(BaseSettings):
     @property
     def telemetry_enabled(self) -> bool:
         return bool(self.langfuse_public_key and self.langfuse_secret_key)
+
+    @property
+    def gemini_usable(self) -> bool:
+        return bool(self.google_api_key or self.google_genai_use_vertexai)
+
+    @property
+    def default_model_id(self) -> str:
+        return self.model_choices[0].id if self.model_choices else DEFAULT_MODEL_ID
+
+    def catalog(self) -> list[ModelChoice]:
+        """Opciones ofrecidas; si no hay catálogo, la única es AGENT_MODEL."""
+        if self.model_choices:
+            return self.model_choices
+
+        return [
+            ModelChoice(
+                id=DEFAULT_MODEL_ID,
+                label=self.agent_model,
+                provider=self.llm_provider,
+                model=self.agent_model,
+            )
+        ]
+
+    def choice(self, model_id: str | None) -> ModelChoice:
+        wanted = model_id or self.default_model_id
+        for option in self.catalog():
+            if option.id == wanted:
+                return option
+        raise UnknownModelError(wanted)
+
+    def is_usable(self, option: ModelChoice) -> bool:
+        """Gemini necesita credenciales; los locales solo que Ollama responda."""
+        if option.provider is LlmProviderName.GEMINI:
+            return self.gemini_usable
+        return bool(self.ollama_api_base)
 
     @model_validator(mode="after")
     def _check_async_driver(self) -> Self:

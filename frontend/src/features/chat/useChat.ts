@@ -1,16 +1,37 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 
 import { api, sendConfirmation, sendMessage } from '../../api/client'
-import type { ServerEvent, SessionSummary } from '../../api/types'
+import type { ModelOption, ServerEvent, SessionSummary } from '../../api/types'
 import { type Message, chatReducer, initialChatState } from './reducer'
 
 const GENERIC_ERROR = 'No pudimos conectar con el asesor. Reintenta en unos segundos.'
+
+const MODEL_KEY = 'asesor.model_id'
+
+function readStoredModel(): string | null {
+  try {
+    return localStorage.getItem(MODEL_KEY)
+  } catch {
+    return null
+  }
+}
 
 export function useChat() {
   const [state, dispatch] = useReducer(chatReducer, initialChatState)
   const [sessions, setSessions] = useState<SessionSummary[]>([])
   const [sessionId, setSessionId] = useState<string | null>(null)
+  const [models, setModels] = useState<ModelOption[]>([])
+  const [modelId, setModelIdState] = useState<string | null>(readStoredModel)
   const abortRef = useRef<AbortController | null>(null)
+
+  const setModelId = useCallback((id: string) => {
+    setModelIdState(id)
+    try {
+      localStorage.setItem(MODEL_KEY, id)
+    } catch {
+      // Preferencia accesoria: si el almacenamiento falla, solo no se recuerda.
+    }
+  }, [])
 
   const refreshSessions = useCallback(async () => {
     try {
@@ -71,10 +92,10 @@ export function useChat() {
 
       const controller = new AbortController()
       abortRef.current = controller
-      await consume(sendMessage(id, text, controller.signal))
+      await consume(sendMessage(id, text, modelId, controller.signal))
       await refreshSessions()
     },
-    [sessionId, createSession, consume, refreshSessions],
+    [sessionId, modelId, createSession, consume, refreshSessions],
   )
 
   const answerConfirmation = useCallback(
@@ -85,11 +106,11 @@ export function useChat() {
       const controller = new AbortController()
       abortRef.current = controller
       await consume(
-        sendConfirmation(sessionId, pending.confirmation_id, approved, controller.signal),
+        sendConfirmation(sessionId, pending.confirmation_id, approved, modelId, controller.signal),
       )
       await refreshSessions()
     },
-    [sessionId, state.pendingConfirmation, consume, refreshSessions],
+    [sessionId, state.pendingConfirmation, modelId, consume, refreshSessions],
   )
 
   const removeSession = useCallback(
@@ -113,6 +134,20 @@ export function useChat() {
 
   useEffect(() => {
     void refreshSessions()
+
+    void api
+      .listModels()
+      .then((available) => {
+        setModels(available)
+        // Si el modelo recordado ya no está en el catálogo (o dejó de estar
+        // configurado), se cae al que el backend marca por defecto.
+        setModelIdState((current) => {
+          const usable = available.find((m) => m.id === current && m.available)
+          return usable?.id ?? available.find((m) => m.is_default)?.id ?? null
+        })
+      })
+      .catch(() => setModels([]))
+
     return () => abortRef.current?.abort()
   }, [refreshSessions])
 
@@ -120,6 +155,9 @@ export function useChat() {
     state,
     sessions,
     sessionId,
+    models,
+    modelId,
+    setModelId,
     send,
     retry,
     createSession,
