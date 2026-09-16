@@ -3,6 +3,7 @@ import { SlidersHorizontal, TriangleAlert } from 'lucide-react'
 
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 import { ThemeToggle } from '@/components/theme-toggle'
 
 import { Composer } from './features/chat/Composer'
@@ -43,7 +44,7 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-full">
+    <SidebarProvider className="h-full">
       <Sidebar
         sessions={sessions}
         activeId={sessionId}
@@ -54,9 +55,12 @@ export default function App() {
 
       <main className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-between border-b px-4 py-3 sm:px-8">
-          <h1 className="text-[15px] font-semibold">
-            Luis <span className="text-muted-foreground font-normal">· asesor automotriz</span>
-          </h1>
+          <div className="flex items-center gap-2">
+            <SidebarTrigger />
+            <h1 className="text-[15px] font-semibold">
+              Luis <span className="text-muted-foreground font-normal">· asesor automotriz</span>
+            </h1>
+          </div>
           <div className="flex items-center gap-2">
             <ModelSelect
               models={models}
@@ -133,7 +137,7 @@ export default function App() {
           onClose={() => toggleDevPanel(false)}
         />
       )}
-    </div>
+    </SidebarProvider>
   )
 }
 
