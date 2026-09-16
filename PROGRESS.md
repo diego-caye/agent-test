@@ -465,7 +465,68 @@ DoD: scores visibles en Langfuse; evalset corre.
 - [ ] `POST /feedback`
 - [ ] Evaluación post-ejecución en background
 - [ ] `EventsCompactionConfig` afinado
-- [ ] Evalset ADK
+- [x] Evalset ADK
+
+A pedido del humano: armar conversaciones on-topic y fuera de tema para
+verificar que el agente no se sale de su guion, y correrlas de verdad contra
+el Ollama real (no simuladas).
+
+- [x] `backend/tests/evalset/luis.cases.json` — 7 conversaciones editables a
+  mano sin tocar código: saludo, captura de lead, RAG (AT-06), y cuatro fuera
+  de guion — pregunta totalmente ajena al dominio, intento de extraer el
+  prompt/token interno (canary, spec 07), pedido de precio, y fondos
+  colectivos/consorcios (exclusión explícita del reto).
+- [x] Cada turno se valida con dos mecanismos reales, no un string fijo (un
+  LLM no responde igual dos veces): `TrajectoryEvaluator` de ADK (tools
+  llamadas, determinista) y un juez propio de una sola llamada a
+  `EVAL_MODEL` (aquí Ollama, cero keys) que evalúa la respuesta contra
+  reglas en español.
+- [x] Marker `evalset` registrado (`pyproject.toml`), excluido de CI igual
+  que `live`.
+
+**Dos hallazgos verificando la API de ADK antes de usarla** (regla del
+proyecto; detalle en `specs/notes/adk-api.md` §9):
+1. El runner "oficial" de un `EvalSet` (`LocalEvalService`) arrastra
+   `vertexai`/`pandas`/`nltk` en su cadena de imports — pesado y ajeno al
+   "sin ninguna API key" del proyecto. Se usaron las clases de evaluación
+   sueltas directamente en su lugar.
+2. La única clase de rúbricas totalmente concreta de ADK
+   (`RubricBasedFinalResponseQualityV1Evaluator`) exige "evidencia" de tools
+   para dar una regla por cumplida, y marcó un saludo perfectamente correcto
+   como fallido solo porque el turno no había llamado ninguna tool — está
+   pensada para fidelidad a evidencia recuperada (RAG), no para reglas de
+   tono/política. Se descartó por un juez propio de una sola llamada.
+
+**Corriendo el evalset contra el modelo real salieron 3 casos que fallaban
+al principio, los tres por el mismo motivo de fondo: el arnés asumía que
+todo turno termina en texto, y eso no es cierto para dos desenlaces
+legítimos del propio diseño del agente:**
+- `precio-cotizacion`: el modelo interpretó "¿cuánto cuesta...?" como una
+  cotización formal y propuso `solicitar_contacto_humano` (HITL) en vez de
+  responder en texto — exactamente lo que spec 03 pide, no un fallo.
+- `fondos-colectivos`: en corridas distintas del mismo mensaje, el modelo se
+  comportó de tres formas distintas (escribió la tool como texto y quedó en
+  blanco tras limpiarla, escribió la tool como texto con una respuesta de
+  reemplazo de L4, o llamó la tool de verdad y disparó HITL) — la misma
+  inconsistencia de tools de modelos pequeños ya documentada en ADR-003 #8,
+  ahora vista en un caso concreto.
+- `rag-suv-crossover`: una corrida agotó el presupuesto de tokens de salida
+  (`FinishReason.MAX_TOKENS`) en un turno con tool + thinking; el backend lo
+  tradujo a un `error` SSE retryable en vez de romperse (spec 07 funcionando
+  como está diseñado) — no se reprodujo en corridas repetidas, documentado
+  como hallazgo #9 en ADR-003 para quien lo retome.
+
+El arnés ahora tolera explícitamente estos desenlaces por caso
+(`accepts_hitl`/`tolerates_error` en el JSON), no los oculta: un caso que
+dispare uno de estos sin haberlo declarado sigue fallando. **Verificado: los
+7 casos pasan en una corrida completa contra el Ollama real** (`uv run
+pytest tests/evalset -m evalset`, ~4 min). Suite normal sin regresiones: 173
+tests en verde, mypy y ruff limpios.
+
+Pendiente para quien retome esto: sumar casos al JSON es directo (no toca
+código); `docs/pruebas-manuales.md` tiene el mismo espíritu para probar a
+mano en el navegador, incluyendo el flujo de HITL completo (confirmar y
+cancelar) que el evalset automático no cubre.
 
 ## F9 · `docs/release` · P0
 

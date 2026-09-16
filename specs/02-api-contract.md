@@ -34,7 +34,7 @@ Ficha actual del lead asociado al usuario dueño de la sesión.
 ### `POST /api/v1/chat/stream` (SSE)
 Envía un mensaje y transmite la respuesta en streaming.
 - Body: `{"session_id": str, "message": str (1–2000), "model_id"?: str}`
-- `model_id` es un `id` del catálogo de `GET /api/v1/models`; si se omite, el primero del catálogo. El modelo se elige **por turno**, no por sesión: la conversación es la misma y el historial se conserva al cambiar, porque la sesión vive en `DatabaseSessionService` y no en el modelo. 400 `unknown_model` si el `id` no existe
+- `model_id` es un `id` del catálogo de `GET /api/v1/models`; si se omite, el que coincide con `AGENT_MODEL` (no "el primero del catálogo": con descubrimiento dinámico de Ollama el orden no es una decisión, spec 11 §3.1). El modelo se elige **por turno**, no por sesión: la conversación es la misma y el historial se conserva al cambiar, porque la sesión vive en `DatabaseSessionService` y no en el modelo. 400 `unknown_model` si el `id` no existe
 - 404 si la sesión no pertenece al `user_id` del header
 - Respuesta: `text/event-stream`, eventos definidos en §2
 - Si hay un fault injection activo (`X-Debug-Fault`, solo `APP_ENV=dev` y `ENABLE_FAULT_INJECTION=true`), fuerza el camino de error correspondiente (spec 07)

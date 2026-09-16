@@ -45,6 +45,8 @@ Tarea en background (no bloquea la respuesta al usuario) que corre con `EVAL_MOD
 
 Persiste en tabla `evaluations` (`session_id`, `message_id`, criterio, score, justificación corta) y emite scores `quality.<criterio>` en Langfuse contra el `trace_id` del turno. Nunca bloquea ni retrasa `message.completed`.
 
+**Estado:** no implementado todavía (F7). Lo que sí existe es el equivalente offline — un dataset dorado de conversaciones (`backend/tests/evalset/`, tipo `evalset` en spec 09) que corre contra el modelo real y un juez LLM (`EVAL_MODEL`) con los mismos criterios de tono/brevedad/precios/fidelidad al RAG, más trayectoria de tools y contención fuera de tema. Es la pieza de "correr conversaciones on-topic y off-topic para verificar que el agente no se sale de su guion" — offline y bajo demanda, no online por muestreo como este mecanismo.
+
 ## 6. Variables de entorno
 
 `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST`, `LANGFUSE_PROJECT_ID` (para el link del panel dev), `EVAL_MODEL`, `EVAL_SAMPLE_RATE`.

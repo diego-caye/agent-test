@@ -60,7 +60,8 @@ implicit_reexport = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-addopts = "-q --strict-markers -m 'not live'"
+addopts = "-q --strict-markers -m 'not live and not evalset'"
 markers = [
     "live: golpea un modelo real; excluido de CI",
+    "evalset: golden dataset de conversaciones contra un modelo real; excluido de CI (spec 09)",
 ]
