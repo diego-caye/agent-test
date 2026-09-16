@@ -4,6 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Asesor automotriz</title>
+    <script>
+      // Se aplica antes de que React o el CSS pinten nada: sin esto, una
+      // preferencia de tema oscuro guardada se ve un instante en claro
+      // (el "flash" clásico de tema equivocado) hasta que el bundle carga.
+      ;(function () {
+        try {
+          var stored = localStorage.getItem('asesor.theme')
+          var dark = stored ? stored === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches
+          document.documentElement.classList.toggle('dark', dark)
+          document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
+        } catch {}
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>
