@@ -20,16 +20,24 @@ import { ETAPA_LABEL } from '../chat/labels'
 type Props = {
   sessions: SessionSummary[]
   activeId: string | null
+  creating: boolean
   onSelect: (sessionId: string) => void
   onCreate: () => void
   onDelete: (sessionId: string) => void
 }
 
-export function Sidebar({ sessions, activeId, onSelect, onCreate, onDelete }: Props) {
+export function Sidebar({ sessions, activeId, creating, onSelect, onCreate, onDelete }: Props) {
   return (
     <nav className="bg-sidebar border-sidebar-border hidden w-60 shrink-0 flex-col border-r md:flex">
       <div className="p-3">
-        <Button type="button" onClick={onCreate} className="h-10 w-full font-semibold">
+        {/* disabled mientras se crea: sin esto, varios clics antes de que
+            llegue la respuesta del primero abrían una conversación por clic. */}
+        <Button
+          type="button"
+          onClick={onCreate}
+          disabled={creating}
+          className="h-10 w-full font-semibold"
+        >
           <MessageSquarePlus aria-hidden="true" />
           Nueva conversación
         </Button>
@@ -97,9 +105,14 @@ export function Sidebar({ sessions, activeId, onSelect, onCreate, onDelete }: Pr
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      {/* variant, no className: AlertDialogAction reenvía la
+                          className al elemento interno de Radix, no al Button
+                          que calcula bg-primary, así que una clase de color
+                          ahí compite con esa por especificidad y a veces
+                          pierde. El variant sí lo controla el propio Button. */}
                       <AlertDialogAction
+                        variant="destructive"
                         onClick={() => onDelete(session.session_id)}
-                        className="bg-destructive/10 text-destructive hover:bg-destructive/20"
                       >
                         Eliminar
                       </AlertDialogAction>

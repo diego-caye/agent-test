@@ -3,6 +3,7 @@ import { SlidersHorizontal, TriangleAlert } from 'lucide-react'
 
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { ThemeToggle } from '@/components/theme-toggle'
 
 import { Composer } from './features/chat/Composer'
 import { MessageList } from './features/chat/MessageList'
@@ -24,6 +25,7 @@ export default function App() {
     setModelId,
     send,
     retry,
+    creatingSession,
     createSession,
     openSession,
     removeSession,
@@ -45,6 +47,7 @@ export default function App() {
       <Sidebar
         sessions={sessions}
         activeId={sessionId}
+        creating={creatingSession}
         onSelect={(id) => void openSession(id)}
         onCreate={() => void createSession()}
         onDelete={(id) => void removeSession(id)}
@@ -73,6 +76,7 @@ export default function App() {
                 Panel dev
               </Button>
             )}
+            <ThemeToggle />
           </div>
         </header>
 
