@@ -84,7 +84,9 @@ Bajo 900px el panel dev se oculta por completo y la sidebar pasa a un drawer. Ba
 ## 5. Componentes clave
 
 ### Burbuja de mensaje
-Agente a la izquierda sobre `--panel`, usuario a la derecha sobre `--user-bubble`. Radio 14px con la esquina del lado del hablante a 4px. Sin avatar: el alineamiento ya distingue quién habla. El texto se transmite token a token; mientras llega, un cursor de bloque parpadea al final (respeta `prefers-reduced-motion` dejándolo fijo).
+Agente a la izquierda sobre `--panel`, usuario a la derecha sobre `--user-bubble`. Radio 14px con la esquina del lado del hablante a 4px. Sin avatar: el alineamiento ya distingue quién habla.
+
+**Sobre el streaming (revisado en F6).** El texto del agente llega en un solo evento, no token a token. No es una simplificación: el filtro de salida L4 necesita ver la respuesta completa antes de que salga, y un delta ya transmitido no se puede retirar del navegador — razonado en `specs/02-api-contract.md` §4. Lo que sí ocurre en vivo, y es de donde viene la sensación de que el asesor está trabajando, son los chips de actividad de las tools, la ficha del lead y la tarjeta HITL. Mientras se espera la respuesta, el cursor de bloque parpadea al final de la burbuja (fijo con `prefers-reduced-motion`).
 
 ### Chip de actividad
 Línea propia, fondo `--accent-soft`, texto `--text-muted`, punto ámbar a la izquierda. Aparece al recibir `tool.started` y se resuelve al llegar `tool.finished`.
