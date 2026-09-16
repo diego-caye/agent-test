@@ -25,8 +25,7 @@ export default function App() {
     setModelId,
     send,
     retry,
-    creatingSession,
-    createSession,
+    startNewConversation,
     openSession,
     removeSession,
     answerConfirmation,
@@ -47,9 +46,8 @@ export default function App() {
       <Sidebar
         sessions={sessions}
         activeId={sessionId}
-        creating={creatingSession}
         onSelect={(id) => void openSession(id)}
-        onCreate={() => void createSession()}
+        onCreate={startNewConversation}
         onDelete={(id) => void removeSession(id)}
       />
 
