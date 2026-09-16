@@ -7,8 +7,10 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-asesor}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-asesor}
       POSTGRES_DB: ${POSTGRES_DB:-asesor}
+    # Puertos por defecto fuera de los habituales (5432, 8000, 5173) a propósito:
+    # es normal tener otros proyectos ocupándolos. Se cambian por env.
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${POSTGRES_PORT:-5490}:5432"
     volumes:
       - dbdata:/var/lib/postgresql/data
     healthcheck:
@@ -24,14 +26,14 @@ services:
         required: false
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-asesor}:${POSTGRES_PASSWORD:-asesor}@db:5432/${POSTGRES_DB:-asesor}
-      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:5173}
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:5190}
       # En .env apunta a localhost, que es lo que usan los scripts del host;
       # desde el contenedor hay que salir al host.
       OLLAMA_API_BASE: ${OLLAMA_API_BASE_CONTAINER:-http://host.docker.internal:11434}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "${BACKEND_PORT:-8000}:8000"
+      - "${BACKEND_PORT:-8090}:8000"
     depends_on:
       db:
         condition: service_healthy
@@ -48,9 +50,21 @@ services:
     environment:
       VITE_API_TARGET: http://backend:8000
     ports:
-      - "${FRONTEND_PORT:-5173}:5173"
+      - "${FRONTEND_PORT:-5190}:5173"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      # El dev server de Vite tarda unos segundos en atender; sin healthcheck
+      # "docker compose ps" lo daba por listo antes de que respondiera.
+      # 127.0.0.1 y no localhost: dentro del contenedor localhost resuelve
+      # primero a ::1 y el dev server de Vite solo escucha en IPv4.
+      test:
+        ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:5173/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
 
 volumes:
   dbdata:

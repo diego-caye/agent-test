@@ -7,10 +7,10 @@ from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 
-# En esta maquina el 5432 lo ocupa un Postgres nativo, por eso el compose publica
-# el 5442. En CI el servicio escucha en el 5432 y se pasa por TEST_DATABASE_URL.
+# El compose publica puertos fuera de los habituales para no chocar con otros
+# proyectos. En CI el servicio escucha en el 5432 y se pasa por TEST_DATABASE_URL.
 TEST_DATABASE_URL = os.environ.get(
-    "TEST_DATABASE_URL", "postgresql+asyncpg://asesor:asesor@localhost:5442/asesor_test"
+    "TEST_DATABASE_URL", "postgresql+asyncpg://asesor:asesor@localhost:5490/asesor_test"
 )
 
 TEST_ENV = {
