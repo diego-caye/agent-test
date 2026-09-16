@@ -394,6 +394,50 @@ reproducía el bug (mensaje + reintento a 0.3s) ya no falla — ambos turnos
 `ok=True`, cero `StaleSessionError` en los logs. 173 tests de backend en
 verde.
 
+- [x] El aviso de "los modelos locales tardan más" del indicador de
+  escritura salía siempre, incluso con Gemini seleccionado (un texto
+  pensado para modelos locales en una llamada a una API en la nube no
+  tiene sentido). Pasa a depender del proveedor real del modelo elegido,
+  no de un texto fijo. Verificado en el navegador con los dos casos.
+
+### Séptima ronda · todo el Ollama dentro de Docker, nada nativo
+
+A pedido explícito del humano: quien descargue el repo no debería
+depender de nada instalado fuera de Docker. Hasta esta ronda, `.env.example`
+ya recomendaba el perfil `local-llm`, pero el `.env` real de esta máquina
+seguía apuntando al Ollama nativo (`host.docker.internal:11434`) — dos
+caminos coexistiendo, y el real (nativo) sin ser el documentado.
+
+- [x] `.env` de esta máquina cambiado para usar exclusivamente el Ollama de
+  Docker: `OLLAMA_API_BASE_CONTAINER=http://ollama:11434`,
+  `COMPOSE_PROFILES=local-llm` (así `docker compose up -d`, sin ningún
+  flag, ya incluye Ollama), `OLLAMA_PORT=11435` (el 11434 del host lo
+  tiene el Ollama nativo, que sigue existiendo para otros proyectos pero
+  este ya no lo toca). `AGENT_MODEL`/`FALLBACK_MODEL` pasaron a los tags
+  fijos (`gemma4:12b`/`llama3.2:3b`) que el `docker-compose.yml` ya
+  bajaba, en vez de los `:latest` de la instalación nativa.
+- [x] `EMBEDDINGS_MODEL` de `embeddinggemma` a `embeddinggemma:300m` — el
+  único cambio con costo real: `verify_embedding_model()` compara el
+  string tal cual contra lo grabado en `kb_chunks`, así que hubo que
+  volver a correr `scripts/ingest_kb.py` (71 fragmentos, contra el Ollama
+  de Docker) antes de que el backend arrancara sin
+  `EmbeddingModelMismatchError`.
+- [x] `.env.example` y `docker-compose.yml` actualizados para que este sea
+  el camino por defecto de cualquiera que clone el repo, no solo de esta
+  máquina: `COMPOSE_PROFILES=local-llm` ya viene en la plantilla.
+- [x] `MODEL_CHOICES` limpiado a solo Gemini (los de Ollama se descubren
+  solos, declararlos a mano ya no tenía efecto desde la ronda del
+  catálogo dinámico).
+
+Verificado de punta a punta contra el Ollama de Docker exclusivamente:
+`GET /api/v1/models` devuelve las 3 variantes instaladas ahí + Gemini,
+`gemma4:12b` como default (coincide con `AGENT_MODEL`); una conversación
+real con saludo (`guardar_lead`) y una pregunta técnica que dispara
+`search_knowledge_base` con respuesta correcta; `ollama ps` dentro del
+contenedor confirma `100% GPU` en los tres modelos con el mismo contexto
+(32768) ya calibrado para la instalación nativa. 173 tests de backend en
+verde (sin cambios, usan su propio entorno de test).
+
 ## F7 · `feature/feedback-evals` · P1
 
 DoD: scores visibles en Langfuse; evalset corre.

@@ -34,6 +34,12 @@ La imagen del servidor empezó fijada en `0.24.0` (la de esta máquina) y tuvo q
 
 El puerto `EmbeddingsPort` y `build_base_model` aíslan la diferencia: fuera de `container.py` y `config.py`, ninguna capa sabe qué proveedor está activo.
 
+**El Ollama de Docker pasó a ser el camino por defecto de esta máquina, no solo el de la plantilla.** Hasta aquí, `.env` de esta máquina seguía apuntando al Ollama nativo (`host.docker.internal:11434`) mientras `.env.example` ya recomendaba el perfil `local-llm`. A pedido del humano —quien descargue el repo no debería depender de nada instalado fuera de Docker— se cambió también el `.env` real: `OLLAMA_API_BASE_CONTAINER=http://ollama:11434`, `COMPOSE_PROFILES=local-llm`, `OLLAMA_PORT=11435` (el 11434 del host ya lo tiene el Ollama nativo, que sigue existiendo para otros proyectos pero este ya no lo toca). `AGENT_MODEL`/`FALLBACK_MODEL` pasaron de `gemma4:latest`/`llama3.2:latest` a los tags fijos `gemma4:12b`/`llama3.2:3b` que el `docker-compose.yml` ya bajaba, para que la app corriera exactamente contra lo que el Ollama de Docker tiene instalado.
+
+`EMBEDDINGS_MODEL` fue el único cambio con un costo real: pasó de `embeddinggemma` (sin tag) a `embeddinggemma:300m`, y `verify_embedding_model()` compara el string tal cual contra lo que quedó grabado en `kb_chunks` al ingerir — un cambio de tag, aunque sea el mismo modelo, se ve como un modelo distinto. Hubo que volver a correr `scripts/ingest_kb.py` (71 fragmentos, contra el Ollama de Docker) antes de que el backend arrancara sin el `EmbeddingModelMismatchError`.
+
+Verificado de punta a punta contra el Ollama de Docker exclusivamente: saludo con `guardar_lead` y una pregunta técnica que dispara `search_knowledge_base` con una respuesta correcta, `ollama ps` confirma los tres modelos en `100% GPU` con el mismo contexto (32768) que ya estaba calibrado para la instalación nativa. El primer turno tardó 90 s (carga en frío del modelo recién levantado en este contenedor); el segundo, 39 s.
+
 ## Hallazgos de la integración
 
 Cada uno costó una iteración y ninguno estaba en la documentación.
