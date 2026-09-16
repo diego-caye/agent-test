@@ -1,7 +1,12 @@
 import { useState } from 'react'
+import { SlidersHorizontal, TriangleAlert } from 'lucide-react'
+
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
 
 import { Composer } from './features/chat/Composer'
 import { MessageList } from './features/chat/MessageList'
+import { ModelSelect } from './features/chat/ModelSelect'
 import { useChat } from './features/chat/useChat'
 import { DevPanel } from './features/devpanel/DevPanel'
 import { ConfirmationCard, HandoffNotice } from './features/hitl/ConfirmationCard'
@@ -14,6 +19,9 @@ export default function App() {
     state,
     sessions,
     sessionId,
+    models,
+    modelId,
+    setModelId,
     send,
     retry,
     createSession,
@@ -43,23 +51,33 @@ export default function App() {
       />
 
       <main className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-between border-b border-edge px-4 py-3 sm:px-8">
+        <header className="flex items-center justify-between border-b px-4 py-3 sm:px-8">
           <h1 className="text-[15px] font-semibold">
-            Luis <span className="font-normal text-muted">· asesor automotriz</span>
+            Luis <span className="text-muted-foreground font-normal">· asesor automotriz</span>
           </h1>
-          {!showDevPanel && (
-            <button
-              type="button"
-              onClick={() => toggleDevPanel(true)}
-              className="rounded-lg border border-edge px-2.5 py-1 text-xs text-muted"
-            >
-              Panel dev
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            <ModelSelect
+              models={models}
+              value={modelId}
+              disabled={state.streaming}
+              onChange={setModelId}
+            />
+            {!showDevPanel && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => toggleDevPanel(true)}
+              >
+                <SlidersHorizontal aria-hidden="true" />
+                Panel dev
+              </Button>
+            )}
+          </div>
         </header>
 
         {state.messages.length === 0 && (
-          <p className="mx-auto mt-10 max-w-md px-6 text-center text-sm text-muted">
+          <p className="text-muted-foreground mx-auto mt-10 max-w-md px-6 text-center text-sm">
             Cuéntale a Luis qué buscas: para qué usarás el auto, qué carrocería te llama o
             cualquier duda técnica. Te orienta sin presionarte.
           </p>
@@ -71,7 +89,7 @@ export default function App() {
           streaming={state.streaming}
         />
 
-        <div className="flex flex-col gap-3 border-t border-edge px-4 py-4 sm:px-8">
+        <div className="flex flex-col gap-3 border-t px-4 py-4 sm:px-8">
           {state.pendingConfirmation && (
             <ConfirmationCard
               confirmation={state.pendingConfirmation}
@@ -83,18 +101,24 @@ export default function App() {
           {state.handoff && <HandoffNotice handoff={state.handoff} />}
 
           {state.error && (
-            <div className="mx-auto flex w-full max-w-2xl items-center justify-between gap-3 rounded-lg border border-danger/50 bg-panel px-4 py-2.5">
-              <p className="text-sm text-danger">{state.error.message}</p>
+            <Alert
+              variant="destructive"
+              className="mx-auto flex w-full max-w-2xl items-center justify-between gap-3"
+            >
+              <TriangleAlert aria-hidden="true" />
+              <AlertDescription>{state.error.message}</AlertDescription>
               {state.error.retryable && state.lastUserMessage && (
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => void retry()}
-                  className="shrink-0 rounded-lg border border-edge px-3 py-1.5 text-xs"
+                  className="shrink-0"
                 >
                   Reintentar
-                </button>
+                </Button>
               )}
-            </div>
+            </Alert>
           )}
 
           <Composer disabled={state.streaming} onSend={(text) => void send(text)} />

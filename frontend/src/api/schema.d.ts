@@ -158,6 +158,30 @@ export interface paths {
         patch: operations["update_handoff_api_v1_handoffs__handoff_id__patch"];
         trace?: never;
     };
+    "/api/v1/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Models
+         * @description Catálogo del selector de modelos.
+         *
+         *     `available` es false para las opciones cuyo proveedor no está configurado
+         *     (Gemini sin API key, por ejemplo): la interfaz las muestra deshabilitadas en
+         *     vez de ocultarlas, para que se vea qué hay y por qué no se puede usar.
+         */
+        get: operations["list_models_api_v1_models_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -168,6 +192,8 @@ export interface components {
             session_id: string;
             /** Message */
             message: string;
+            /** Model Id */
+            model_id?: string | null;
         };
         /** ConfirmationRequest */
         ConfirmationRequest: {
@@ -179,6 +205,8 @@ export interface components {
             approved: boolean;
             /** Comment */
             comment?: string | null;
+            /** Model Id */
+            model_id?: string | null;
         };
         /** CreateSessionResponse */
         CreateSessionResponse: {
@@ -273,8 +301,25 @@ export interface components {
              */
             created_at: string;
         };
+        /** ModelOption */
+        ModelOption: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Provider */
+            provider: string;
+            /** Model */
+            model: string;
+            /** Available */
+            available: boolean;
+            /** Is Default */
+            is_default: boolean;
+        };
         /** SessionSummary */
         SessionSummary: {
+            /** Titulo */
+            titulo?: string | null;
             /** Session Id */
             session_id: string;
             /**
@@ -631,6 +676,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_models_api_v1_models_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelOption"][];
                 };
             };
         };
