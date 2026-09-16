@@ -108,8 +108,12 @@ services:
     # Versión fija, no :latest: una imagen que cambia sola en cada pull puede
     # dejar de entender OLLAMA_THINK o el formato de /api/show que usa el
     # descubrimiento de modelos (infrastructure/llm/ollama_discovery.py) sin
-    # ningún aviso. 0.24.0 es la que está probada en este proyecto (ADR-003).
-    image: ollama/ollama:0.24.0
+    # ningún aviso. 0.24.0 (la que usa esta máquina, ADR-003) no alcanza:
+    # gemma4:12b necesita 0.30.3+ (0.30.5+ para evitar un crash conocido de
+    # esa variante) — probado en carne propia, "pull model manifest: 412
+    # requires a newer version of Ollama". 0.34.0 es la última estable
+    # publicada al fijar esto.
+    image: ollama/ollama:0.34.0
     environment:
       # Ollama recorta el contexto en silencio si no se le indica cuánto usar.
       OLLAMA_CONTEXT_LENGTH: ${OLLAMA_CONTEXT_LENGTH:-16384}
@@ -145,7 +149,7 @@ services:
   # variante distinta a la que el resto de la app tiene configurada.
   ollama-pull:
     profiles: ["local-llm"]
-    image: ollama/ollama:0.24.0
+    image: ollama/ollama:0.34.0
     depends_on:
       ollama:
         condition: service_healthy
