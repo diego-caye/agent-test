@@ -80,7 +80,7 @@ Hallazgo importante: el autogenerate de Alembic veía las tablas de ADK (`sessio
 
 ## F4 · `feature/frontend` · P0
 
-DoD: flujo end-to-end en el navegador. **Código completo; la verificación del camino feliz en navegador está bloqueada por la falta de `GOOGLE_API_KEY` real.**
+DoD: flujo end-to-end en el navegador. **Cumplido.**
 
 - [x] Plan de diseño en `docs/ui.md` (paleta azul noche + ámbar, tipografía, layout ASCII, principios y anti-patrones)
 - [x] Sidebar de conversaciones + panel de chat + panel dev plegable
