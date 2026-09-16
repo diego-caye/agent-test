@@ -80,14 +80,21 @@ Hallazgo importante: el autogenerate de Alembic veía las tablas de ADK (`sessio
 
 ## F4 · `feature/frontend` · P0
 
-DoD: flujo end-to-end en el navegador.
+DoD: flujo end-to-end en el navegador. **Cumplido.**
 
-- [ ] Plan de diseño (colores, tipografías, layout ASCII)
-- [ ] Sidebar de conversaciones + panel de chat + panel dev
-- [ ] Streaming token a token, chips de actividad
-- [ ] Tarjeta HITL
-- [ ] Feedback 👍/👎
-- [ ] Tipos desde OpenAPI, tests vitest (parser SSE, reducer)
+- [x] Plan de diseño en `docs/ui.md` (paleta azul noche + ámbar, tipografía, layout ASCII, principios y anti-patrones)
+- [x] Sidebar de conversaciones + panel de chat + panel dev plegable
+- [x] Streaming token a token con cursor, chips de actividad por tool
+- [x] Tarjeta HITL con motivo en lenguaje natural y aviso de ticket
+- [x] Errores que dicen qué hacer + botón Reintentar
+- [x] Tipos generados desde `/openapi.json` (`npm run gen:types`)
+- [x] Tests vitest del parser SSE y del reducer del chat (17 casos)
+- [x] **Verificación del camino feliz en navegador** — desbloqueada con los modelos locales
+- [ ] Feedback 👍/👎 — movido a F7, junto con el endpoint que lo respalda
+
+Verificado el 2026-09-15 en Chromium contra el stack real con `qwen3:4b` local: conversación completa, ficha del lead llenándose en vivo en el panel dev (nombre, uso, nivel de interés), chip de etapa, latencia/tokens/modelo del turno, sesión listada en la sidebar. Sin errores de consola y sin scroll horizontal a 390px. `tsc --noEmit` limpio con `noUncheckedIndexedAccess`, `vite build` y 17 tests de vitest en verde.
+
+La captura del navegador fue lo que destapó dos bugs que los tests con el doble no podían ver: el modelo escribiendo `guardar_lead(...)` como texto en la burbuja, y el filtro de categoría del RAG devolviendo `no_results` con la respuesta en la KB.
 
 ## F5 · `feature/rag` · P0
 

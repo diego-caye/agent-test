@@ -27,10 +27,21 @@ class KnowledgeService:
         """Return chunks above the score floor, or an empty list (no_results)."""
         embedding = await self._embeddings.embed_query(query)
         chunks = await self._retriever.search(embedding, categoria=categoria, top_k=top_k)
+        accepted = self._above_floor(chunks)
 
+        if not accepted and categoria is not None:
+            # El LLM elige la categoría y a veces se equivoca: pedir CARROCERIAS
+            # como SEGMENTOS deja fuera justo los fragmentos buenos. El filtro es
+            # una optimización, no una condición: si no da nada, se reintenta sin él.
+            logger.info("sin resultados en %s, reintentando sin filtro", categoria.value)
+            chunks = await self._retriever.search(embedding, categoria=None, top_k=top_k)
+            accepted = self._above_floor(chunks)
+
+        return accepted
+
+    def _above_floor(self, chunks: list[RetrievedChunk]) -> list[RetrievedChunk]:
         if not chunks or chunks[0].score < self._min_score:
             return []
-
         return [chunk for chunk in chunks if chunk.score >= self._min_score]
 
     async def verify_embedding_model(self) -> None:

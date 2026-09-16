@@ -47,16 +47,23 @@ def build_embeddings(settings: Settings) -> EmbeddingsPort:
     return OllamaEmbeddings(model=settings.embeddings_model, api_base=settings.ollama_api_base)
 
 
+def _ollama_kwargs(settings: Settings, *, think: bool) -> dict[str, object]:
+    # num_ctx siempre: sin él Ollama recorta el contexto en silencio.
+    kwargs: dict[str, object] = {
+        "api_base": settings.ollama_api_base,
+        "num_ctx": settings.ollama_context_length,
+    }
+    # think solo donde corresponde: mandárselo a un modelo sin esa capacidad
+    # devuelve 400 "does not support thinking" (ADR-003).
+    if think and settings.ollama_think is not None:
+        kwargs["think"] = settings.ollama_think
+    return kwargs
+
+
 def build_base_model(settings: Settings) -> BaseLlm:
     if settings.llm_provider is LlmProviderName.OLLAMA:
         # El prefijo ollama_chat/ ya viene en AGENT_MODEL y lo valida Settings.
-        # num_ctx es obligatorio: sin él Ollama recorta el contexto en silencio.
-        return LiteLlm(
-            model=settings.agent_model,
-            api_base=settings.ollama_api_base,
-            num_ctx=settings.ollama_context_length,
-            think=settings.ollama_think,
-        )
+        return LiteLlm(model=settings.agent_model, **_ollama_kwargs(settings, think=True))
 
     return Gemini(model=settings.agent_model)
 
@@ -66,12 +73,9 @@ def build_fallback_model(settings: Settings) -> BaseLlm | None:
         return None
 
     if settings.llm_provider is LlmProviderName.OLLAMA:
-        return LiteLlm(
-            model=settings.fallback_model,
-            api_base=settings.ollama_api_base,
-            num_ctx=settings.ollama_context_length,
-            think=settings.ollama_think,
-        )
+        # OLLAMA_THINK describe al modelo principal. El respaldo suele ser otro
+        # más pequeño y sin esa capacidad, así que nunca se le envía.
+        return LiteLlm(model=settings.fallback_model, **_ollama_kwargs(settings, think=False))
 
     return Gemini(model=settings.fallback_model)
 

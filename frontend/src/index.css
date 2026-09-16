@@ -1,1 +1,73 @@
 @import 'tailwindcss';
+
+@theme {
+  --color-surface: #12161f;
+  --color-panel: #1a202c;
+  --color-raised: #222a38;
+  --color-edge: #2c3544;
+  --color-ink: #e7eaf0;
+  --color-muted: #94a0b4;
+  --color-accent: #e8a33d;
+  --color-accent-ink: #1a1206;
+  --color-accent-soft: #3b3020;
+  --color-user-bubble: #2a3547;
+  --color-ok: #4fa87b;
+  --color-danger: #d8695c;
+
+  --font-sans: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes caret {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  50%,
+  95% {
+    opacity: 0;
+  }
+}
+
+.caret::after {
+  content: '';
+  display: inline-block;
+  width: 0.5ch;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: -0.15em;
+  background: var(--color-accent);
+  animation: caret 1.1s steps(1, end) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caret::after {
+    animation: none;
+    opacity: 1;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
+}
