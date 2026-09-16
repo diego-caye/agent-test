@@ -166,13 +166,14 @@ export function useChat() {
   }, [setSessionId])
 
   const send = useCallback(
-    // echo=false para reintentar: el mensaje que se reenvía ya está en
-    // pantalla (recién escrito, o recuperado del historial de una
-    // conversación que se quedó sin respuesta), así que agregarlo nuevamente
-    // solo lo duplicaría en la lista.
-    async (text: string, { echo = true }: { echo?: boolean } = {}) => {
+    // Cómo reflejar el texto en la lista antes de mandarlo:
+    //   'append'       mensaje nuevo de verdad -> se agrega una burbuja (por defecto)
+    //   'silent'       reintento tal cual -> ya está en pantalla, no se toca
+    //   'replace-last' reintento editado -> corrige la última burbuja en su lugar
+    async (text: string, mode: 'append' | 'silent' | 'replace-last' = 'append') => {
       const id = sessionId ?? (await createSession())
-      if (echo) dispatch({ type: 'user-sent', content: text })
+      if (mode === 'append') dispatch({ type: 'user-sent', content: text })
+      else if (mode === 'replace-last') dispatch({ type: 'edit-last-message', content: text })
 
       const controller = new AbortController()
       abortRef.current = controller
@@ -213,8 +214,17 @@ export function useChat() {
   )
 
   const retry = useCallback(async () => {
-    if (state.lastUserMessage) await send(state.lastUserMessage, { echo: false })
+    if (state.lastUserMessage) await send(state.lastUserMessage, 'silent')
   }, [state.lastUserMessage, send])
+
+  // Reintentar con el texto corregido: la burbuja se edita en su propio
+  // lugar (reducer 'edit-last-message'), no se agrega una nueva.
+  const editAndResend = useCallback(
+    async (text: string) => {
+      await send(text, 'replace-last')
+    },
+    [send],
+  )
 
   // Vuelve a leer la URL al usar atrás/adelante del navegador: pushState (en
   // navigate(), lib/route.ts) no dispara 'popstate' por sí solo, pero un
@@ -282,6 +292,7 @@ export function useChat() {
     setModelId,
     send,
     retry,
+    editAndResend,
     startNewConversation,
     openSession,
     removeSession,
