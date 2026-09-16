@@ -47,10 +47,11 @@ Responde una confirmación HITL pendiente y reanuda el stream del turno.
 - 404 si `confirmation_id` no existe o ya fue resuelto
 
 ### `GET /api/v1/models`
-Catálogo del selector de modelos, en el orden de `MODEL_CHOICES`.
-- 200: `[{"id", "label", "provider": "gemini"|"ollama", "model", "available": bool, "is_default": bool}]`
+Catálogo del selector de modelos: las entradas que no son de Ollama vienen de `MODEL_CHOICES` (típicamente Gemini); las de Ollama se descubren en el arranque contra el propio servidor (spec 11 §3.1), no se declaran a mano.
+- 200: `[{"id", "label", "provider": "gemini"|"ollama", "model", "available": bool, "is_default": bool, "supports_tools": bool, "supports_thinking": bool}]`
 - `available` es false cuando el proveedor de esa opción no está configurado (Gemini sin `GOOGLE_API_KEY`). La interfaz las muestra deshabilitadas en vez de ocultarlas, para que se vea qué hay y por qué no se puede usar
-- Sin `MODEL_CHOICES` el catálogo tiene una sola entrada, la de `AGENT_MODEL`, y el selector se oculta
+- `supports_tools`/`supports_thinking` reflejan las `capabilities` reales del modelo (para Ollama, tomadas de `/api/show`; para las entradas declaradas a mano, `true` salvo que se indique lo contrario) — la interfaz los muestra como íconos en el selector
+- Sin `MODEL_CHOICES` ni modelos de Ollama instalados, el catálogo tiene una sola entrada, la de `AGENT_MODEL`, y el selector se oculta
 - No requiere `X-User-Id`: es configuración del despliegue, no del usuario
 
 ### `POST /api/v1/feedback`
