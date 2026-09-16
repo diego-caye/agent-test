@@ -29,6 +29,14 @@ TEST_ENV = {
     "EMBEDDINGS_PROVIDER": "gemini",
     "EMBEDDINGS_MODEL": "gemini-embedding-001",
     "GUARDRAIL_CANARY_TOKEN": "CANARY-TEST-0001",
+    # En blanco a proposito, aunque el .env real del desarrollador tenga keys
+    # de verdad (F7): sin esto, Settings cae al ../.env real y los tests que
+    # asumen "sin Langfuse configurado" (telemetry_enabled is False) se
+    # rompen -- o peor, llamarian a la API real de Langfuse sin querer.
+    "LANGFUSE_PUBLIC_KEY": "",
+    "LANGFUSE_SECRET_KEY": "",
+    "LANGFUSE_HOST": "",
+    "LANGFUSE_PROJECT_ID": "",
     # FakeEmbeddings es bolsa de palabras: sus scores no viven en el mismo rango
     # que los de un embedder real, para el que está calibrado el 0.55 de produccion.
     # Medido sobre la KB real: consulta relevante ~0.55, irrelevante ~0.07, así que
@@ -71,7 +79,9 @@ async def clean_database(settings: Settings) -> None:
     async with engine.begin() as connection:
         await connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await connection.run_sync(Base.metadata.create_all)
-        await connection.execute(text("TRUNCATE TABLE leads, handoffs, kb_chunks, session_titles"))
+        await connection.execute(
+            text("TRUNCATE TABLE leads, handoffs, kb_chunks, session_titles, feedback, evaluations")
+        )
     await engine.dispose()
 
 

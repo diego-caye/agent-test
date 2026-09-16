@@ -6,6 +6,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any
 
+import httpx
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource
@@ -19,19 +20,26 @@ logger = logging.getLogger("asesor.turn")
 _SERVICE_NAME = "asesor-automotriz"
 
 
+def _langfuse_host(settings: Settings) -> str:
+    return (settings.langfuse_host or "https://cloud.langfuse.com").rstrip("/")
+
+
+def _langfuse_auth_header(settings: Settings) -> str:
+    credentials = f"{settings.langfuse_public_key}:{settings.langfuse_secret_key}"
+    token = base64.b64encode(credentials.encode()).decode()
+    return f"Basic {token}"
+
+
 def setup_telemetry(settings: Settings) -> None:
     """Wire OTel to Langfuse. Without keys the provider stays un-exported (no-op)."""
     provider = TracerProvider(resource=Resource.create({"service.name": _SERVICE_NAME}))
 
     if settings.telemetry_enabled:
-        host = (settings.langfuse_host or "https://cloud.langfuse.com").rstrip("/")
-        credentials = f"{settings.langfuse_public_key}:{settings.langfuse_secret_key}"
-        token = base64.b64encode(credentials.encode()).decode()
         provider.add_span_processor(
             BatchSpanProcessor(
                 OTLPSpanExporter(
-                    endpoint=f"{host}/api/public/otel/v1/traces",
-                    headers={"Authorization": f"Basic {token}"},
+                    endpoint=f"{_langfuse_host(settings)}/api/public/otel/v1/traces",
+                    headers={"Authorization": _langfuse_auth_header(settings)},
                 )
             )
         )
@@ -41,6 +49,41 @@ def setup_telemetry(settings: Settings) -> None:
     from openinference.instrumentation.google_adk import GoogleADKInstrumentor
 
     GoogleADKInstrumentor().instrument(tracer_provider=provider)
+
+
+async def send_langfuse_score(
+    settings: Settings, *, trace_id: str, name: str, value: float, comment: str | None = None
+) -> None:
+    """Adjunta un score a un trace ya cerrado (spec 08 S4/S5, verificado en vivo
+    contra `POST /api/public/scores`: la API "legacy" de lectura de traces está
+    deprecada para orgs nuevas, pero la de escritura de scores sigue viva).
+
+    No-op sin keys. Nunca lanza si Langfuse no responde: un score es un
+    adorno de observabilidad, no debe tumbar la respuesta al usuario ni el
+    turno de evaluación en background que lo dispara.
+    """
+    if not settings.telemetry_enabled:
+        return
+
+    payload: dict[str, Any] = {
+        "traceId": trace_id,
+        "name": name,
+        "value": value,
+        "dataType": "NUMERIC",
+    }
+    if comment:
+        payload["comment"] = comment
+
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.post(
+                f"{_langfuse_host(settings)}/api/public/scores",
+                json=payload,
+                headers={"Authorization": _langfuse_auth_header(settings)},
+            )
+            response.raise_for_status()
+    except httpx.HTTPError:
+        logger.warning("no se pudo enviar el score %r a Langfuse", name, exc_info=True)
 
 
 @dataclass(slots=True)

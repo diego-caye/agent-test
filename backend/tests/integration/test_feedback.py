@@ -1,0 +1,121 @@
+from uuid import UUID, uuid4
+
+from httpx import AsyncClient
+from sqlalchemy import select
+
+from asesor.infrastructure.db.engine import SessionFactory
+from asesor.infrastructure.db.models import FeedbackRow
+
+
+async def new_session(client: AsyncClient, user_id: UUID) -> str:
+    response = await client.post("/api/v1/sessions", headers={"X-User-Id": str(user_id)})
+    response.raise_for_status()
+    session_id: str = response.json()["session_id"]
+    return session_id
+
+
+async def test_feedback_se_guarda_y_devuelve_ok(
+    client: AsyncClient, user_id: UUID, session_factory: SessionFactory
+) -> None:
+    session_id = await new_session(client, user_id)
+
+    response = await client.post(
+        "/api/v1/feedback",
+        json={
+            "session_id": session_id,
+            "trace_id": "abc123",
+            "score": 1,
+            "comment": "muy útil",
+        },
+        headers={"X-User-Id": str(user_id)},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
+
+    async with session_factory() as db_session:
+        row = await db_session.scalar(
+            select(FeedbackRow).where(FeedbackRow.session_id == session_id)
+        )
+    assert row is not None
+    assert row.score == 1
+    assert row.comment == "muy útil"
+    assert row.trace_id == "abc123"
+    assert row.user_id == user_id
+
+
+async def test_feedback_sin_comentario_es_opcional(client: AsyncClient, user_id: UUID) -> None:
+    session_id = await new_session(client, user_id)
+
+    response = await client.post(
+        "/api/v1/feedback",
+        json={"session_id": session_id, "trace_id": "abc123", "score": -1},
+        headers={"X-User-Id": str(user_id)},
+    )
+
+    assert response.status_code == 200
+
+
+async def test_feedback_404_si_la_sesion_no_es_del_usuario(
+    client: AsyncClient, user_id: UUID
+) -> None:
+    session_id = await new_session(client, user_id)
+    otro_usuario = uuid4()
+
+    response = await client.post(
+        "/api/v1/feedback",
+        json={"session_id": session_id, "trace_id": "abc123", "score": 1},
+        headers={"X-User-Id": str(otro_usuario)},
+    )
+
+    assert response.status_code == 404
+
+
+async def test_feedback_404_si_la_sesion_no_existe(client: AsyncClient, user_id: UUID) -> None:
+    response = await client.post(
+        "/api/v1/feedback",
+        json={"session_id": "no-existe", "trace_id": "abc123", "score": 1},
+        headers={"X-User-Id": str(user_id)},
+    )
+
+    assert response.status_code == 404
+
+
+async def test_feedback_rechaza_un_score_fuera_de_rango(client: AsyncClient, user_id: UUID) -> None:
+    session_id = await new_session(client, user_id)
+
+    response = await client.post(
+        "/api/v1/feedback",
+        json={"session_id": session_id, "trace_id": "abc123", "score": 5},
+        headers={"X-User-Id": str(user_id)},
+    )
+
+    assert response.status_code == 422
+
+
+async def test_feedback_rechaza_un_comentario_demasiado_largo(
+    client: AsyncClient, user_id: UUID
+) -> None:
+    session_id = await new_session(client, user_id)
+
+    response = await client.post(
+        "/api/v1/feedback",
+        json={
+            "session_id": session_id,
+            "trace_id": "abc123",
+            "score": 1,
+            "comment": "x" * 501,
+        },
+        headers={"X-User-Id": str(user_id)},
+    )
+
+    assert response.status_code == 422
+
+
+async def test_feedback_requiere_x_user_id(client: AsyncClient) -> None:
+    response = await client.post(
+        "/api/v1/feedback",
+        json={"session_id": "s1", "trace_id": "abc123", "score": 1},
+    )
+
+    assert response.status_code == 401

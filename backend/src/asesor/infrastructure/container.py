@@ -10,6 +10,7 @@ from google.adk.sessions import BaseSessionService, DatabaseSessionService
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from asesor.agent.factory import APP_NAME, create_adk_app, create_agent
+from asesor.application.evaluation_service import EvaluationService
 from asesor.application.handoff_service import HandoffService
 from asesor.application.knowledge_service import KnowledgeService
 from asesor.application.lead_service import LeadService
@@ -24,6 +25,8 @@ from asesor.config import (
 )
 from asesor.domain.knowledge import EmbeddingsPort
 from asesor.infrastructure.db.engine import create_engine, create_session_factory
+from asesor.infrastructure.db.evaluation_repository import SqlEvaluationRepository
+from asesor.infrastructure.db.feedback_repository import SqlFeedbackRepository
 from asesor.infrastructure.db.handoff_repository import SqlHandoffRepository
 from asesor.infrastructure.db.kb_repository import PgVectorRetriever
 from asesor.infrastructure.db.lead_repository import SqlLeadRepository
@@ -45,6 +48,8 @@ class Container:
     knowledge_service: KnowledgeService
     title_service: TitleService
     session_titles: SqlSessionTitleRepository
+    feedback: SqlFeedbackRepository
+    evaluation_service: EvaluationService
     session_service: BaseSessionService
     runners: "RunnerRegistry"
 
@@ -220,6 +225,19 @@ def build_title_model(settings: Settings, model: str | BaseLlm | None = None) ->
     return Gemini(model=settings.guardrail_model)
 
 
+def build_eval_model(settings: Settings, model: str | BaseLlm | None = None) -> BaseLlm:
+    """Juez de la evaluación post-turno en background (spec 08 S5): EVAL_MODEL,
+    no el del agente -- es una tarea de clasificación, no de conversación.
+    """
+    if isinstance(model, BaseLlm):
+        return model
+
+    if settings.llm_provider is LlmProviderName.OLLAMA:
+        return LiteLlm(model=settings.eval_model, **_ollama_kwargs(settings, think=False))
+
+    return Gemini(model=settings.eval_model)
+
+
 def build_llm(settings: Settings, model: str | BaseLlm | None, choice: ModelChoice) -> BaseLlm:
     """Envuelve el modelo con reintentos y respaldo (spec 07 §3).
 
@@ -243,6 +261,7 @@ async def build_container(
     model: str | BaseLlm | None = None,
     embeddings: EmbeddingsPort | None = None,
     title_model: BaseLlm | None = None,
+    eval_model: BaseLlm | None = None,
 ) -> Container:
     engine = create_engine(settings.database_url)
     session_factory = create_session_factory(engine)
@@ -258,6 +277,10 @@ async def build_container(
     sessions = session_service or DatabaseSessionService(db_url=settings.database_url)
     session_titles = SqlSessionTitleRepository(session_factory)
     title_service = TitleService(build_title_model(settings, title_model), session_titles)
+    feedback = SqlFeedbackRepository(session_factory)
+    evaluation_service = EvaluationService(
+        build_eval_model(settings, eval_model), SqlEvaluationRepository(session_factory), settings
+    )
 
     # Async y solo si hay OLLAMA_API_BASE: en los tests no se configura (usan
     # Gemini + un BaseLlm falso), así que esto no les pega a la red. Si Ollama
@@ -286,6 +309,8 @@ async def build_container(
         knowledge_service=knowledge_service,
         title_service=title_service,
         session_titles=session_titles,
+        feedback=feedback,
+        evaluation_service=evaluation_service,
         session_service=sessions,
         runners=RunnerRegistry(build_runner, settings, catalog),
     )
