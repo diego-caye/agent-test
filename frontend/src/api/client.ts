@@ -24,6 +24,44 @@ export function getUserId(): string {
 
 const userId = getUserId()
 
+// El backend acumula la respuesta del modelo y no manda nada por el cable
+// hasta que el turno termina (spec 02 §4: L4 necesita ver el texto completo).
+// Eso significa que, para un turno sin tools, la conexión puede quedar en
+// silencio total mientras dura la generación — y con Gemini se ha medido más
+// de 2 minutos en un solo turno con reintentos de proveedor. El plazo tiene
+// que cubrir eso con margen; lo que corta de verdad es una conexión colgada
+// (el proceso del modelo murió, Docker perdió la red), no un turno lento.
+const STREAM_IDLE_TIMEOUT_MS = 180_000
+
+export class StreamIdleTimeoutError extends Error {
+  constructor() {
+    super('El asesor no respondió a tiempo.')
+    this.name = 'StreamIdleTimeoutError'
+  }
+}
+
+async function readWithIdleTimeout(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  timeoutMs: number,
+): Promise<ReadableStreamReadResult<Uint8Array>> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const read = reader.read()
+  // Si gana el timeout, más tarde cancelamos el reader y esa lectura pendiente
+  // puede terminar rechazando igual: sin este no-op, Node la reporta como
+  // "unhandled rejection" aunque el resultado de la carrera ya se haya resuelto.
+  read.catch(() => {})
+  try {
+    return await Promise.race([
+      read,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new StreamIdleTimeoutError()), timeoutMs)
+      }),
+    ])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 function headers(): HeadersInit {
   return { 'Content-Type': 'application/json', 'X-User-Id': userId }
 }
@@ -46,10 +84,14 @@ export const api = {
   listModels: () => request<ModelOption[]>('/api/v1/models'),
 }
 
-async function* streamEvents(
+// Exportada solo para que el test del timeout pueda pasar un plazo corto y
+// usar timers reales, en vez de esperar 3 minutos o lidiar con temporizadores
+// falsos compitiendo dentro de un Promise.race.
+export async function* streamEvents(
   path: string,
   body: unknown,
   signal: AbortSignal,
+  idleTimeoutMs = STREAM_IDLE_TIMEOUT_MS,
 ): AsyncGenerator<ServerEvent> {
   const response = await fetch(path, {
     method: 'POST',
@@ -66,14 +108,21 @@ async function* streamEvents(
   const decoder = new TextDecoder()
   const parse = createSseParser()
 
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
+  try {
+    while (true) {
+      const { done, value } = await readWithIdleTimeout(reader, idleTimeoutMs)
+      if (done) break
 
-    for (const frame of parse(decoder.decode(value, { stream: true }))) {
-      const event = toServerEvent(frame)
-      if (event) yield event
+      for (const frame of parse(decoder.decode(value, { stream: true }))) {
+        const event = toServerEvent(frame)
+        if (event) yield event
+      }
     }
+  } catch (error) {
+    // El timeout no cierra la conexión por sí solo: sin esto, la petición
+    // colgada sigue viva en el navegador aunque ya hayamos dejado de leerla.
+    await reader.cancel().catch(() => {})
+    throw error
   }
 }
 
