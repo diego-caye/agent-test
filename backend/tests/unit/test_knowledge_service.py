@@ -81,3 +81,36 @@ async def test_modelo_coincidente_no_lanza() -> None:
     )
 
     await service.verify_embedding_model()
+
+
+class CategoriaAwareRetriever:
+    """Devuelve resultados solo cuando NO se filtra por categoría."""
+
+    def __init__(self) -> None:
+        self.categorias_pedidas: list[CategoriaKb | None] = []
+
+    async def search(
+        self, embedding: Sequence[float], *, categoria: CategoriaKb | None, top_k: int
+    ) -> list[RetrievedChunk]:
+        self.categorias_pedidas.append(categoria)
+        return [] if categoria is not None else [chunk("a", 0.80)]
+
+    async def stored_embedding_model(self) -> str | None:
+        return "fake-embeddings"
+
+
+async def test_reintenta_sin_filtro_si_la_categoria_no_da_resultados() -> None:
+    retriever = CategoriaAwareRetriever()
+    service = KnowledgeService(FakeEmbeddings(), retriever, min_score=0.5)
+
+    result = await service.search("q", categoria=CategoriaKb.SEGMENTOS, top_k=4)
+
+    assert [c.chunk_id for c in result] == ["a"]
+    assert retriever.categorias_pedidas == [CategoriaKb.SEGMENTOS, None]
+
+
+async def test_no_reintenta_si_ya_venia_sin_filtro() -> None:
+    retriever = StubRetriever([], "fake-embeddings")
+    service = KnowledgeService(FakeEmbeddings(), retriever, min_score=0.5)
+
+    assert await service.search("q", categoria=None, top_k=4) == []
