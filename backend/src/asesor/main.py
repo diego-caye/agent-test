@@ -7,7 +7,7 @@ from google.adk.models.base_llm import BaseLlm
 from google.adk.sessions import BaseSessionService, DatabaseSessionService
 
 from asesor.api.errors import register_error_handlers
-from asesor.api.routers import chat, handoffs, health, sessions
+from asesor.api.routers import chat, handoffs, health, models, sessions
 from asesor.config import Settings, get_settings
 from asesor.domain.knowledge import EmbeddingsPort
 from asesor.infrastructure.container import build_container, close_container
@@ -19,13 +19,14 @@ def create_app(
     session_service: BaseSessionService | None = None,
     model: str | BaseLlm | None = None,
     embeddings: EmbeddingsPort | None = None,
+    title_model: BaseLlm | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         setup_telemetry(settings)
-        container = build_container(settings, session_service, model, embeddings)
+        container = build_container(settings, session_service, model, embeddings, title_model)
         if isinstance(container.session_service, DatabaseSessionService):
             await container.session_service.prepare_tables()
         # Falla rápido si la KB se ingirió con otro modelo: son espacios
@@ -58,5 +59,6 @@ def create_app(
     app.include_router(sessions.router)
     app.include_router(chat.router)
     app.include_router(handoffs.router)
+    app.include_router(models.router)
 
     return app

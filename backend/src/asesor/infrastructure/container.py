@@ -1,3 +1,5 @@
+import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from google.adk.models import Gemini
@@ -11,7 +13,8 @@ from asesor.agent.factory import APP_NAME, create_adk_app, create_agent
 from asesor.application.handoff_service import HandoffService
 from asesor.application.knowledge_service import KnowledgeService
 from asesor.application.lead_service import LeadService
-from asesor.config import EmbeddingsProviderName, LlmProviderName, Settings
+from asesor.application.title_service import TitleService
+from asesor.config import EmbeddingsProviderName, LlmProviderName, ModelChoice, Settings
 from asesor.domain.knowledge import EmbeddingsPort
 from asesor.infrastructure.db.engine import create_engine, create_session_factory
 from asesor.infrastructure.db.handoff_repository import SqlHandoffRepository
@@ -21,6 +24,8 @@ from asesor.infrastructure.embeddings.gemini import GeminiEmbeddings
 from asesor.infrastructure.embeddings.ollama import OllamaEmbeddings
 from asesor.infrastructure.llm.resilient import ResilientLlm
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass(slots=True)
 class Container:
@@ -29,8 +34,39 @@ class Container:
     lead_service: LeadService
     handoff_service: HandoffService
     knowledge_service: KnowledgeService
+    title_service: TitleService
     session_service: BaseSessionService
-    runner: Runner
+    runners: "RunnerRegistry"
+
+    @property
+    def runner(self) -> Runner:
+        return self.runners.get(None)
+
+
+class RunnerRegistry:
+    """Un Runner por modelo del catálogo, creado la primera vez que se pide.
+
+    Los servicios de aplicación y el servicio de sesiones se comparten: lo único
+    que cambia entre runners es el modelo que usa el agente, así que una
+    conversación puede alternar de modelo sin perder su historial ni su ficha.
+    """
+
+    def __init__(self, build: Callable[[ModelChoice], Runner], settings: Settings) -> None:
+        self._build = build
+        self._settings = settings
+        self._runners: dict[str, Runner] = {}
+
+    def get(self, model_id: str | None) -> Runner:
+        option = self._settings.choice(model_id)
+        if option.id not in self._runners:
+            logger.info("creando runner para el modelo %s (%s)", option.id, option.model)
+            self._runners[option.id] = self._build(option)
+        return self._runners[option.id]
+
+    async def close(self) -> None:
+        for runner in self._runners.values():
+            await runner.close()
+        self._runners.clear()
 
 
 def build_embeddings(settings: Settings) -> EmbeddingsPort:
@@ -60,19 +96,22 @@ def _ollama_kwargs(settings: Settings, *, think: bool) -> dict[str, object]:
     return kwargs
 
 
-def build_base_model(settings: Settings) -> BaseLlm:
-    if settings.llm_provider is LlmProviderName.OLLAMA:
-        # El prefijo ollama_chat/ ya viene en AGENT_MODEL y lo valida Settings.
-        return LiteLlm(model=settings.agent_model, **_ollama_kwargs(settings, think=True))
+def build_base_model(settings: Settings, choice: ModelChoice | None = None) -> BaseLlm:
+    option = choice or settings.choice(None)
 
-    return Gemini(model=settings.agent_model)
+    if option.provider is LlmProviderName.OLLAMA:
+        # El prefijo ollama_chat/ lo valida Settings para AGENT_MODEL y lo
+        # comprueba el catálogo para el resto de opciones.
+        return LiteLlm(model=option.model, **_ollama_kwargs(settings, think=True))
+
+    return Gemini(model=option.model)
 
 
-def build_fallback_model(settings: Settings) -> BaseLlm | None:
-    if settings.fallback_model == settings.agent_model:
+def build_fallback_model(settings: Settings, choice: ModelChoice) -> BaseLlm | None:
+    if settings.fallback_model == choice.model:
         return None
 
-    if settings.llm_provider is LlmProviderName.OLLAMA:
+    if choice.provider is LlmProviderName.OLLAMA:
         # OLLAMA_THINK describe al modelo principal. El respaldo suele ser otro
         # más pequeño y sin esa capacidad, así que nunca se le envía.
         return LiteLlm(model=settings.fallback_model, **_ollama_kwargs(settings, think=False))
@@ -80,7 +119,24 @@ def build_fallback_model(settings: Settings) -> BaseLlm | None:
     return Gemini(model=settings.fallback_model)
 
 
-def build_llm(settings: Settings, model: str | BaseLlm | None) -> BaseLlm:
+def build_title_model(settings: Settings, model: str | BaseLlm | None = None) -> BaseLlm:
+    """Modelo para titular conversaciones: el ligero, no el del agente.
+
+    Es una tarea trivial y en segundo plano; gastar el modelo grande solo
+    añadiría latencia y carga de GPU sin mejorar el resultado.
+    """
+    if isinstance(model, BaseLlm):
+        return model
+
+    if settings.llm_provider is LlmProviderName.OLLAMA:
+        return LiteLlm(model=settings.guardrail_model, **_ollama_kwargs(settings, think=False))
+
+    return Gemini(model=settings.guardrail_model)
+
+
+def build_llm(
+    settings: Settings, model: str | BaseLlm | None, choice: ModelChoice | None = None
+) -> BaseLlm:
     """Envuelve el modelo con reintentos y respaldo (spec 07 §3).
 
     Los tests inyectan su propio BaseLlm y también quedan envueltos, así el
@@ -91,9 +147,10 @@ def build_llm(settings: Settings, model: str | BaseLlm | None) -> BaseLlm:
         # fallback sin necesitar un segundo modelo.
         return ResilientLlm(model=model.model, primary=model, fallback=model)
 
-    primary = build_base_model(settings)
+    option = choice or settings.choice(None)
+    primary = build_base_model(settings, option)
     return ResilientLlm(
-        model=primary.model, primary=primary, fallback=build_fallback_model(settings)
+        model=primary.model, primary=primary, fallback=build_fallback_model(settings, option)
     )
 
 
@@ -102,6 +159,7 @@ def build_container(
     session_service: BaseSessionService | None = None,
     model: str | BaseLlm | None = None,
     embeddings: EmbeddingsPort | None = None,
+    title_model: BaseLlm | None = None,
 ) -> Container:
     engine = create_engine(settings.database_url)
     session_factory = create_session_factory(engine)
@@ -115,13 +173,17 @@ def build_container(
     )
 
     sessions = session_service or DatabaseSessionService(db_url=settings.database_url)
-    agent = create_agent(
-        settings, lead_service, handoff_service, knowledge_service, build_llm(settings, model)
-    )
-    runner = Runner(
-        app=create_adk_app(settings, agent),
-        session_service=sessions,
-    )
+    title_service = TitleService(build_title_model(settings, title_model), sessions)
+
+    def build_runner(choice: ModelChoice) -> Runner:
+        agent = create_agent(
+            settings,
+            lead_service,
+            handoff_service,
+            knowledge_service,
+            build_llm(settings, model, choice),
+        )
+        return Runner(app=create_adk_app(settings, agent), session_service=sessions)
 
     return Container(
         settings=settings,
@@ -129,13 +191,14 @@ def build_container(
         lead_service=lead_service,
         handoff_service=handoff_service,
         knowledge_service=knowledge_service,
+        title_service=title_service,
         session_service=sessions,
-        runner=runner,
+        runners=RunnerRegistry(build_runner, settings),
     )
 
 
 async def close_container(container: Container) -> None:
-    await container.runner.close()
+    await container.runners.close()
     await container.engine.dispose()
 
 

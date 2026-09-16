@@ -3,16 +3,17 @@ from collections.abc import AsyncIterator
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Header, Request
+from fastapi import APIRouter, BackgroundTasks, Header, Request
 from fastapi.responses import StreamingResponse
 from google.adk.events import Event
 
 from asesor.agent.guardrails.faults import parse_fault
 from asesor.api.dependencies import UserId
 from asesor.api.dtos import ChatRequest, ConfirmationRequest
-from asesor.api.errors import NotFoundError
+from asesor.api.errors import AppError, NotFoundError
 from asesor.api.sse import SseEvent, translate
 from asesor.application.chat_service import ChatService, SessionNotFoundError
+from asesor.config import UnknownModelError
 from asesor.infrastructure.container import Container
 from asesor.infrastructure.telemetry import log_turn, turn_span
 
@@ -72,9 +73,17 @@ async def _stream(
         )
 
 
-async def _guarded_service(request: Request, user_id: UUID, session_id: str) -> ChatService:
+async def _guarded_service(
+    request: Request, user_id: UUID, session_id: str, model_id: str | None = None
+) -> ChatService:
     container: Container = request.app.state.container
-    service = ChatService(container.runner, container.session_service)
+
+    try:
+        runner = container.runners.get(model_id)
+    except UnknownModelError as exc:
+        raise AppError("UNKNOWN_MODEL", str(exc), http_status=422) from exc
+
+    service = ChatService(runner, container.session_service)
     try:
         await service.get_session(user_id, session_id)
     except SessionNotFoundError as exc:
@@ -87,19 +96,27 @@ async def chat_stream(
     request: Request,
     user_id: UserId,
     body: ChatRequest,
+    background: BackgroundTasks,
     x_debug_fault: Annotated[str | None, Header()] = None,
 ) -> StreamingResponse:
     container: Container = request.app.state.container
-    service = await _guarded_service(request, user_id, body.session_id)
+    service = await _guarded_service(request, user_id, body.session_id, body.model_id)
 
     # El header se ignora fuera de dev, aunque venga (spec 07 §4).
     fault = parse_fault(x_debug_fault) if container.settings.fault_injection_active else None
+
+    # En segundo plano: titular la conversación no debe sumar latencia al turno
+    # ni romperlo si el modelo ligero falla.
+    background.add_task(
+        container.title_service.ensure_title, str(user_id), body.session_id, body.message
+    )
 
     events = service.run_turn(user_id, body.session_id, body.message, fault)
     return StreamingResponse(
         _stream(container, body.session_id, user_id, events),
         media_type="text/event-stream",
         headers=SSE_HEADERS,
+        background=background,
     )
 
 
@@ -108,7 +125,7 @@ async def chat_confirmation(
     request: Request, user_id: UserId, body: ConfirmationRequest
 ) -> StreamingResponse:
     container: Container = request.app.state.container
-    service = await _guarded_service(request, user_id, body.session_id)
+    service = await _guarded_service(request, user_id, body.session_id, body.model_id)
 
     events = service.resume_with_confirmation(
         user_id, body.session_id, body.confirmation_id, body.approved
