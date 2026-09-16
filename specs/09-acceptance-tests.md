@@ -1,6 +1,6 @@
 # 09 · Tests de aceptación
 
-Formato Given/When/Then. `Tipo`: `unit` (dominio/aplicación con `FakeLlm`, sin red), `integration` (API + Postgres real, `FakeLlm`), `live` (modelo real, marcado `@pytest.mark.live`, fuera de CI), `evalset` (ADK evalset, spec 08 §5). `Trayectoria` lista las tools esperadas en orden; `—` si ninguna.
+Formato Given/When/Then. `Tipo`: `unit` (dominio/aplicación con `FakeLlm`, sin red), `integration` (API + Postgres real, `FakeLlm`), `live` (modelo real, marcado `@pytest.mark.live`, fuera de CI), `evalset` (dataset dorado de conversaciones contra un modelo real, marcado `@pytest.mark.evalset`, fuera de CI; `backend/tests/evalset/`, spec 08 §5 y specs/notes/adk-api.md §9 — usa las clases de evaluación de ADK directamente, no `LocalEvalService`). `Trayectoria` lista las tools esperadas en orden; `—` si ninguna.
 
 ## AT-01 · Saludo sin nombre
 **Tipo:** integration · **Trayectoria:** —

@@ -170,6 +170,18 @@ La tool nunca se ejecutaba y el usuario veía eso en la burbuja del chat. Se det
 
 L4 ahora detecta y elimina esas pseudo-llamadas (`strip_pseudo_tool_calls`). No arregla que la tool no se ejecutara —eso depende del modelo— pero evita que el usuario vea código.
 
+### 9. RAG + thinking a veces agota el presupuesto de tokens de salida
+
+Encontrado corriendo el evalset (`backend/tests/evalset/`, F7) contra `gemma4:12b` real: la pregunta "¿cuál es la diferencia entre un SUV y un crossover?" (dispara `search_knowledge_base`) terminó una vez en
+
+```
+upstream error FinishReason.MAX_TOKENS: Maximum tokens reached
+```
+
+`asesor/api/sse.py::translate` ya lo maneja como está diseñado (spec 07): un `event.error_code` se traduce a un SSE `error` retryable, nunca a una burbuja rota ni a un crash — el manejo de fallos funcionó. No es un caso aislado de "sin texto visible" (hallazgo #4): ahí el modelo no produce nada; aquí sí produce (razonamiento + la propia respuesta) pero se queda sin presupuesto de tokens antes de cerrarla, con `OLLAMA_THINK=low` y contexto 32768 ya activos.
+
+No se investigó a fondo el remedio (subir `num_predict`/`max_tokens` explícito, o recortar los fragmentos de la KB que entran al contexto) porque no se reprodujo en corridas repetidas del mismo caso — parece ocasional, no sistemático. Queda anotado para quien retome F7/evalset: si se vuelve frecuente, el primer sospechoso es el tamaño de los chunks de la KB que se inyectan como resultado de la tool, no el modelo en sí.
+
 ## Diferencias frente a Gemini
 
 - **Calidad conversacional:** buena en ambos modelos locales. Respetan el rol, el tuteo peruano, el límite de 2–3 oraciones y las frases canned del baseline. La respuesta de RAG queda fundamentada en los fragmentos recuperados.
