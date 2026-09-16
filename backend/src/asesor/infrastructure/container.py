@@ -1,5 +1,5 @@
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from google.adk.models import Gemini
@@ -14,7 +14,14 @@ from asesor.application.handoff_service import HandoffService
 from asesor.application.knowledge_service import KnowledgeService
 from asesor.application.lead_service import LeadService
 from asesor.application.title_service import TitleService
-from asesor.config import EmbeddingsProviderName, LlmProviderName, ModelChoice, Settings
+from asesor.config import (
+    DEFAULT_MODEL_ID,
+    EmbeddingsProviderName,
+    LlmProviderName,
+    ModelChoice,
+    Settings,
+    UnknownModelError,
+)
 from asesor.domain.knowledge import EmbeddingsPort
 from asesor.infrastructure.db.engine import create_engine, create_session_factory
 from asesor.infrastructure.db.handoff_repository import SqlHandoffRepository
@@ -22,6 +29,7 @@ from asesor.infrastructure.db.kb_repository import PgVectorRetriever
 from asesor.infrastructure.db.lead_repository import SqlLeadRepository
 from asesor.infrastructure.embeddings.gemini import GeminiEmbeddings
 from asesor.infrastructure.embeddings.ollama import OllamaEmbeddings
+from asesor.infrastructure.llm.ollama_discovery import OllamaModelInfo, discover_ollama_models
 from asesor.infrastructure.llm.resilient import ResilientLlm
 
 logger = logging.getLogger(__name__)
@@ -43,6 +51,61 @@ class Container:
         return self.runners.get(None)
 
 
+def build_catalog(
+    settings: Settings, discovered_ollama: Sequence[OllamaModelInfo]
+) -> list[ModelChoice]:
+    """El catálogo real del selector: lo declarado a mano (típicamente Gemini,
+    la API sí necesita una key y no hay forma de "descubrirla" localmente) más
+    lo que Ollama reporta tener instalado ahora mismo.
+
+    Los modelos de Ollama no se declaran en MODEL_CHOICES: se descubren en el
+    arranque (discover_ollama_models), así la lista nunca queda
+    desincronizada de lo que de verdad hay *pulled* — ni incluye modelos de
+    solo-embeddings, que ya vienen filtrados.
+    """
+    static = [
+        choice for choice in settings.model_choices if choice.provider is not LlmProviderName.OLLAMA
+    ]
+    dynamic = [
+        ModelChoice(
+            id=info.name,
+            label=info.name,
+            provider=LlmProviderName.OLLAMA,
+            model=f"ollama_chat/{info.name}",
+            supports_tools=info.supports_tools,
+            supports_thinking=info.supports_thinking,
+        )
+        for info in discovered_ollama
+    ]
+    catalog = [*static, *dynamic]
+
+    if not catalog:
+        catalog = [
+            ModelChoice(
+                id=DEFAULT_MODEL_ID,
+                label=settings.agent_model,
+                provider=settings.llm_provider,
+                model=settings.agent_model,
+            )
+        ]
+
+    return catalog
+
+
+def _default_choice_id(catalog: Sequence[ModelChoice], settings: Settings) -> str:
+    """El modelo configurado en AGENT_MODEL, si aparece en el catálogo.
+
+    No es simplemente "la primera opción": con el catálogo de Ollama armado
+    por descubrimiento, el orden depende de lo que el servidor haya listado,
+    no de una intención declarada. Lo único estable es AGENT_MODEL.
+    """
+    agent_model = settings.agent_model.removeprefix("ollama_chat/")
+    for option in catalog:
+        if option.model.removeprefix("ollama_chat/") == agent_model:
+            return option.id
+    return catalog[0].id if catalog else DEFAULT_MODEL_ID
+
+
 class RunnerRegistry:
     """Un Runner por modelo del catálogo, creado la primera vez que se pide.
 
@@ -51,13 +114,31 @@ class RunnerRegistry:
     conversación puede alternar de modelo sin perder su historial ni su ficha.
     """
 
-    def __init__(self, build: Callable[[ModelChoice], Runner], settings: Settings) -> None:
+    def __init__(
+        self, build: Callable[[ModelChoice], Runner], settings: Settings, catalog: list[ModelChoice]
+    ) -> None:
         self._build = build
-        self._settings = settings
+        self._catalog = catalog
+        self._default_id = _default_choice_id(catalog, settings)
         self._runners: dict[str, Runner] = {}
 
+    @property
+    def catalog(self) -> list[ModelChoice]:
+        return self._catalog
+
+    @property
+    def default_id(self) -> str:
+        return self._default_id
+
+    def choice(self, model_id: str | None) -> ModelChoice:
+        wanted = model_id or self._default_id
+        for option in self._catalog:
+            if option.id == wanted:
+                return option
+        raise UnknownModelError(wanted)
+
     def get(self, model_id: str | None) -> Runner:
-        option = self._settings.choice(model_id)
+        option = self.choice(model_id)
         if option.id not in self._runners:
             logger.info("creando runner para el modelo %s (%s)", option.id, option.model)
             self._runners[option.id] = self._build(option)
@@ -96,15 +177,18 @@ def _ollama_kwargs(settings: Settings, *, think: bool) -> dict[str, object]:
     return kwargs
 
 
-def build_base_model(settings: Settings, choice: ModelChoice | None = None) -> BaseLlm:
-    option = choice or settings.choice(None)
-
-    if option.provider is LlmProviderName.OLLAMA:
+def build_base_model(settings: Settings, choice: ModelChoice) -> BaseLlm:
+    if choice.provider is LlmProviderName.OLLAMA:
         # El prefijo ollama_chat/ lo valida Settings para AGENT_MODEL y lo
-        # comprueba el catálogo para el resto de opciones.
-        return LiteLlm(model=option.model, **_ollama_kwargs(settings, think=True))
+        # arma build_catalog para el resto de opciones. think solo si la
+        # propia opción soporta pensar (supports_thinking, descubierto en
+        # vivo): mandárselo a un modelo sin esa capacidad devuelve 400 "does
+        # not support thinking" (ADR-003) — antes se enviaba siempre.
+        return LiteLlm(
+            model=choice.model, **_ollama_kwargs(settings, think=choice.supports_thinking)
+        )
 
-    return Gemini(model=option.model)
+    return Gemini(model=choice.model)
 
 
 def build_fallback_model(settings: Settings, choice: ModelChoice) -> BaseLlm | None:
@@ -134,9 +218,7 @@ def build_title_model(settings: Settings, model: str | BaseLlm | None = None) ->
     return Gemini(model=settings.guardrail_model)
 
 
-def build_llm(
-    settings: Settings, model: str | BaseLlm | None, choice: ModelChoice | None = None
-) -> BaseLlm:
+def build_llm(settings: Settings, model: str | BaseLlm | None, choice: ModelChoice) -> BaseLlm:
     """Envuelve el modelo con reintentos y respaldo (spec 07 §3).
 
     Los tests inyectan su propio BaseLlm y también quedan envueltos, así el
@@ -147,14 +229,13 @@ def build_llm(
         # fallback sin necesitar un segundo modelo.
         return ResilientLlm(model=model.model, primary=model, fallback=model)
 
-    option = choice or settings.choice(None)
-    primary = build_base_model(settings, option)
+    primary = build_base_model(settings, choice)
     return ResilientLlm(
-        model=primary.model, primary=primary, fallback=build_fallback_model(settings, option)
+        model=primary.model, primary=primary, fallback=build_fallback_model(settings, choice)
     )
 
 
-def build_container(
+async def build_container(
     settings: Settings,
     session_service: BaseSessionService | None = None,
     model: str | BaseLlm | None = None,
@@ -175,6 +256,15 @@ def build_container(
     sessions = session_service or DatabaseSessionService(db_url=settings.database_url)
     title_service = TitleService(build_title_model(settings, title_model), sessions)
 
+    # Async y solo si hay OLLAMA_API_BASE: en los tests no se configura (usan
+    # Gemini + un BaseLlm falso), así que esto no les pega a la red. Si Ollama
+    # está apagado o tardando en arrancar, discover_ollama_models ya devuelve
+    # [] en vez de tumbar el arranque del backend.
+    discovered = (
+        await discover_ollama_models(settings.ollama_api_base) if settings.ollama_api_base else []
+    )
+    catalog = build_catalog(settings, discovered)
+
     def build_runner(choice: ModelChoice) -> Runner:
         agent = create_agent(
             settings,
@@ -193,7 +283,7 @@ def build_container(
         knowledge_service=knowledge_service,
         title_service=title_service,
         session_service=sessions,
-        runners=RunnerRegistry(build_runner, settings),
+        runners=RunnerRegistry(build_runner, settings, catalog),
     )
 
 

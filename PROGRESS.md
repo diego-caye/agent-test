@@ -302,6 +302,54 @@ Verificado en el navegador: clic en "Editar" convierte la burbuja de
 misma burbuja pasa a mostrar el texto nuevo y recibe su respuesta — la
 conversación sigue teniendo 2 mensajes, no 3.
 
+### Quinta ronda · catálogo dinámico de Ollama y versiones fijas
+
+A pedido del humano: los modelos de Ollama dejan de declararse a mano en
+`MODEL_CHOICES` y se descubren en vivo; de paso, nada de `:latest` en lo
+que Docker instala solo.
+
+- [x] `infrastructure/llm/ollama_discovery.py`: `GET /api/tags` + `POST
+  /api/show` por modelo, filtra los que no tienen `"completion"` en
+  `capabilities` (así `embeddinggemma` nunca aparece en el selector de
+  chat) y trae `supports_tools`/`supports_thinking` reales.
+- [x] `infrastructure/container.py`: el catálogo (`build_catalog`) mezcla
+  lo estático (Gemini, vía `MODEL_CHOICES`) con lo descubierto; una
+  entrada de Ollama declarada a mano se ignora a propósito. El modelo por
+  defecto es el que coincide con `AGENT_MODEL`, no "el primero de la
+  lista" — con descubrimiento dinámico el orden no es una decisión.
+  `RunnerRegistry` pasa a resolver sus propios ids en vez de delegar en
+  `Settings`, que se queda solo con configuración estática.
+  `build_container` pasa a ser async (un único call site, `main.py`).
+- [x] `build_base_model` ya no manda `think` siempre al modelo principal:
+  solo si `supports_thinking` de la opción elegida es cierto — antes
+  mandarlo a un modelo sin esa capacidad tiraba 400 (ADR-003), ahora ya no
+  puede pasar con ninguna opción del catálogo.
+- [x] `ModelOption`/`ModelSelect`: íconos de razonamiento y herramientas
+  por modelo en el desplegable (verificado: `qwen3:4b-instruct` sin ícono
+  de razonamiento, `qwen3:4b` con los dos — son variantes con capacidades
+  distintas de verdad, no solo de nombre).
+- [x] `docker-compose.yml`: `ollama/ollama:0.24.0` fijo (no `:latest`) y
+  el job `ollama-pull` ahora baja los **cuatro** modelos que la app usa
+  (agente, guardrail/eval, respaldo, embeddings) con tags explícitos —
+  antes solo bajaba dos; cualquier turno que tocara el respaldo o el
+  guardrail habría fallado con "model not found" la primera vez que hiciera
+  falta en una instalación fresca desde GitHub.
+- [x] `.env.example` y specs 02/11/ADR-003 sincronizados con el nuevo
+  contrato de `GET /api/v1/models` y la política de versiones fijas.
+- [x] 11 tests nuevos (`test_ollama_discovery.py`, `test_model_catalog.py`).
+
+Verificado contra el Ollama real de esta máquina: 163 tests de backend en
+verde, `GET /api/v1/models` devuelve 5 opciones (4 de Ollama descubiertas
++ Gemini), `embeddinggemma` correctamente ausente, capacidades distintas
+por variante confirmadas.
+
+**Pendiente, sin ejecutar en esta sesión:** una descarga limpia con
+`docker compose --profile local-llm up -d` usando los tags nuevos
+(`gemma4:12b` en vez del `gemma4:latest` de 8B ya afinado en esta
+máquina) — implica bajar varios GB y no se hizo sin pedirlo. Antes de
+confiar en ese perfil para la demo, correr `ollama ps` y repetir el
+ajuste de VRAM/contexto de ADR-003 si hace falta.
+
 ## F7 · `feature/feedback-evals` · P1
 
 DoD: scores visibles en Langfuse; evalset corre.
@@ -310,14 +358,6 @@ DoD: scores visibles en Langfuse; evalset corre.
 - [ ] Evaluación post-ejecución en background
 - [ ] `EventsCompactionConfig` afinado
 - [ ] Evalset ADK
-
-## F8 · `feature/local-llm` · P2
-
-DoD: AT principales con Gemma 4.
-
-- [ ] `ADR-003-local-llm.md`
-- [ ] Ollama en Docker (perfil `local-llm`)
-- [ ] `EMBEDDINGS_PROVIDER=ollama` + re-ingesta
 
 ## F9 · `docs/release` · P0
 

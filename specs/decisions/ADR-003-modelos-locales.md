@@ -28,6 +28,8 @@ El agente pasó por tres candidatos antes de quedar fijo, y cada cambio salió d
 
 `qwen3:4b` (con thinking) queda como alternativa: entra en GPU con mucha menos VRAM libre y también llama las tres tools, a cambio de respuestas más escuetas.
 
+**`:latest` en la tabla de arriba describe esta máquina, ya afinada — no la plantilla para GitHub.** `.env.example` y `docker-compose.yml` fijan tags explícitos (`gemma4:12b`, `llama3.2:3b`, `embeddinggemma:300m`, imagen `ollama/ollama:0.24.0`), para que una descarga limpia sea reproducible en vez de heredar lo que `:latest` resuelva ese día (spec 11 §3). `gemma4:12b` no es exactamente el mismo peso que `gemma4:latest` (que aquí resolvió a la variante de 8B) — es la variante nombrada más cercana; si el ajuste de VRAM/contexto de esta tabla no aplica igual a esa descarga fresca, hay que volver a medir con `ollama ps`, no asumir.
+
 El puerto `EmbeddingsPort` y `build_base_model` aíslan la diferencia: fuera de `container.py` y `config.py`, ninguna capa sabe qué proveedor está activo.
 
 ## Hallazgos de la integración

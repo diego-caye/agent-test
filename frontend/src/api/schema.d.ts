@@ -169,6 +169,11 @@ export interface paths {
          * List Models
          * @description Catálogo del selector de modelos.
          *
+         *     Para Ollama, este catálogo no viene de configuración: se descubrió en el
+         *     arranque contra /api/tags + /api/show (ver infrastructure.container),
+         *     así que siempre refleja lo que de verdad hay instalado, con sus
+         *     capacidades reales (supports_tools, supports_thinking).
+         *
          *     `available` es false para las opciones cuyo proveedor no está configurado
          *     (Gemini sin API key, por ejemplo): la interfaz las muestra deshabilitadas en
          *     vez de ocultarlas, para que se vea qué hay y por qué no se puede usar.
@@ -315,6 +320,10 @@ export interface components {
             available: boolean;
             /** Is Default */
             is_default: boolean;
+            /** Supports Tools */
+            supports_tools: boolean;
+            /** Supports Thinking */
+            supports_thinking: boolean;
         };
         /** SessionSummary */
         SessionSummary: {

@@ -26,7 +26,7 @@ def create_app(
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         setup_telemetry(settings)
-        container = build_container(settings, session_service, model, embeddings, title_model)
+        container = await build_container(settings, session_service, model, embeddings, title_model)
         if isinstance(container.session_service, DatabaseSessionService):
             await container.session_service.prepare_tables()
         # Falla rápido si la KB se ingirió con otro modelo: son espacios
