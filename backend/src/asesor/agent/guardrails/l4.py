@@ -26,9 +26,17 @@ TOOL_NAMES = ("guardar_lead", "solicitar_contacto_humano", "search_knowledge_bas
 # Los modelos pequeños a veces "escriben" la llamada en vez de emitirla como
 # function call. El texto queda en pantalla y la tool nunca se ejecuta. Visto
 # con Gemma 4 vía Ollama (ADR-003).
+#
+# No basta con `tool(...)` en su propia línea: también la escribe con llaves y
+# con un prefijo inventado, pegada al final de un párrafo, como
+# `llama:guardar_lead{uso_principal:<|"|>VIAJES<|"|>}`. De ahí que se acepten
+# los tres tipos de paréntesis y un prefijo opcional `algo:` o `<|algo|>:`.
 _PSEUDO_TOOL_CALL = re.compile(
-    r"^\s*(?:" + "|".join(TOOL_NAMES) + r")\s*\([^)]*\)\s*$",
-    re.MULTILINE,
+    r"(?:^|\s)"
+    r"(?:[<\[|]{0,2}[a-z_]{0,16}[>\]|]{0,2}\s*[:=]\s*)?"
+    r"(?:" + "|".join(TOOL_NAMES) + r")"
+    r"\s*(?:\([^()]*\)|\{[^{}]*\}|\[[^\[\]]*\])",
+    re.IGNORECASE,
 )
 
 
@@ -42,7 +50,10 @@ class L4Verdict:
 def strip_pseudo_tool_calls(text: str) -> str:
     """Quita las llamadas a tools que el modelo escribió como texto."""
     without = _PSEUDO_TOOL_CALL.sub("", text)
-    return re.sub(r"\n{2,}", "\n", without).strip()
+    # El patrón se come el separador que iba delante, así que hay que dejar los
+    # espacios y los saltos como estaban antes de recortar.
+    collapsed = re.sub(r"[ \t]{2,}", " ", without)
+    return re.sub(r"\n{2,}", "\n", collapsed).strip()
 
 
 def _fold(text: str) -> str:
