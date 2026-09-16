@@ -13,7 +13,17 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
+import {
+  Sidebar as SidebarRoot,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuAction,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from '@/components/ui/sidebar'
 
 import type { SessionSummary } from '../../api/types'
 import { sessionPath } from '../../lib/route'
@@ -29,107 +39,115 @@ type Props = {
 
 export function Sidebar({ sessions, activeId, onSelect, onCreate, onDelete }: Props) {
   return (
-    <nav className="bg-sidebar border-sidebar-border hidden w-60 shrink-0 flex-col border-r md:flex">
-      <div className="p-3">
+    <SidebarRoot collapsible="offcanvas">
+      <SidebarHeader className="p-3">
         <Button type="button" onClick={onCreate} className="h-10 w-full font-semibold">
           <MessageSquarePlus aria-hidden="true" />
           Nueva conversación
         </Button>
-      </div>
+      </SidebarHeader>
 
-      <ScrollArea className="flex-1">
-        <ul className="px-2 pb-3">
-          {sessions.length === 0 && (
-            <li className="text-muted-foreground px-2 py-3 text-xs">
-              Todavía no tienes conversaciones.
-            </li>
-          )}
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {sessions.length === 0 && (
+                <p className="text-muted-foreground px-2 py-3 text-xs">
+                  Todavía no tienes conversaciones.
+                </p>
+              )}
 
-          {sessions.map((session) => {
-            const isActive = session.session_id === activeId
+              {sessions.map((session) => {
+                const isActive = session.session_id === activeId
 
-            // Un <a href> real, no un <button>: así se puede abrir en pestaña
-            // nueva con clic central o Ctrl/Cmd+clic, copiar el enlace con
-            // clic derecho, o simplemente pegar la URL en otra pestaña. El
-            // clic normal se intercepta para navegar sin recargar la página.
-            function handleClick(event: MouseEvent<HTMLAnchorElement>) {
-              const usesModifier =
-                event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey
-              if (usesModifier) return
-              event.preventDefault()
-              onSelect(session.session_id)
-            }
+                // Un <a href> real, no un <button>: así se puede abrir en pestaña
+                // nueva con clic central o Ctrl/Cmd+clic, copiar el enlace con
+                // clic derecho, o simplemente pegar la URL en otra pestaña. El
+                // clic normal se intercepta para navegar sin recargar la página.
+                function handleClick(event: MouseEvent<HTMLAnchorElement>) {
+                  const usesModifier =
+                    event.button !== 0 ||
+                    event.metaKey ||
+                    event.ctrlKey ||
+                    event.shiftKey ||
+                    event.altKey
+                  if (usesModifier) return
+                  event.preventDefault()
+                  onSelect(session.session_id)
+                }
 
-            return (
-              <li key={session.session_id} className="group relative">
-                <a
-                  href={sessionPath(session.session_id)}
-                  onClick={handleClick}
-                  aria-current={isActive ? 'true' : undefined}
-                  className={[
-                    'block w-full rounded-lg py-2 pr-9 pl-3 text-left transition-colors',
-                    isActive ? 'bg-sidebar-accent' : 'hover:bg-sidebar-accent/60',
-                  ].join(' ')}
-                >
-                  {/* El título lo genera el modelo ligero en segundo plano; hasta
-                      que llega, la conversación ya tiene que poder distinguirse. */}
-                  <span className="block truncate text-sm">
-                    {session.titulo || 'Conversación nueva'}
-                  </span>
-                  <span className="text-muted-foreground block truncate text-[11px]">
-                    {new Date(session.last_update_time).toLocaleString('es-PE', {
-                      day: '2-digit',
-                      month: 'short',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                    {' · '}
-                    {ETAPA_LABEL[session.etapa] ?? session.etapa}
-                  </span>
-                </a>
-
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-xs"
-                      aria-label="Eliminar conversación"
-                      title="Eliminar conversación"
-                      className="text-muted-foreground hover:text-destructive absolute top-2.5 right-2 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-                    >
-                      <Trash2 aria-hidden="true" />
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>¿Eliminar esta conversación?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Se borran los mensajes de «{session.titulo || 'Conversación nueva'}». Tu
-                        ficha de datos no se pierde: vive a nivel de usuario, no de conversación.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      {/* variant, no className: AlertDialogAction reenvía la
-                          className al elemento interno de Radix, no al Button
-                          que calcula bg-primary, así que una clase de color
-                          ahí compite con esa por especificidad y a veces
-                          pierde. El variant sí lo controla el propio Button. */}
-                      <AlertDialogAction
-                        variant="destructive"
-                        onClick={() => onDelete(session.session_id)}
+                return (
+                  <SidebarMenuItem key={session.session_id}>
+                    <SidebarMenuButton asChild isActive={isActive} className="h-auto py-2 pr-8">
+                      <a
+                        href={sessionPath(session.session_id)}
+                        onClick={handleClick}
+                        aria-current={isActive ? 'true' : undefined}
                       >
-                        Eliminar
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </li>
-            )
-          })}
-        </ul>
-      </ScrollArea>
-    </nav>
+                        <span className="flex min-w-0 flex-col">
+                          {/* El título lo genera el modelo ligero en segundo
+                              plano; hasta que llega, la conversación ya tiene
+                              que poder distinguirse. */}
+                          <span className="block truncate text-sm">
+                            {session.titulo || 'Conversación nueva'}
+                          </span>
+                          <span className="text-muted-foreground block truncate text-[11px]">
+                            {new Date(session.last_update_time).toLocaleString('es-PE', {
+                              day: '2-digit',
+                              month: 'short',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                            {' · '}
+                            {ETAPA_LABEL[session.etapa] ?? session.etapa}
+                          </span>
+                        </span>
+                      </a>
+                    </SidebarMenuButton>
+
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <SidebarMenuAction
+                          showOnHover
+                          aria-label="Eliminar conversación"
+                          title="Eliminar conversación"
+                          className="text-muted-foreground hover:text-destructive top-2.5"
+                        >
+                          <Trash2 aria-hidden="true" />
+                        </SidebarMenuAction>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>¿Eliminar esta conversación?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Se borran los mensajes de «{session.titulo || 'Conversación nueva'}».
+                            Tu ficha de datos no se pierde: vive a nivel de usuario, no de
+                            conversación.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          {/* variant, no className: AlertDialogAction reenvía la
+                              className al elemento interno de Radix, no al Button
+                              que calcula bg-primary, así que una clase de color
+                              ahí compite con esa por especificidad y a veces
+                              pierde. El variant sí lo controla el propio Button. */}
+                          <AlertDialogAction
+                            variant="destructive"
+                            onClick={() => onDelete(session.session_id)}
+                          >
+                            Eliminar
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </SidebarMenuItem>
+                )
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+    </SidebarRoot>
   )
 }

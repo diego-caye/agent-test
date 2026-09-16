@@ -302,6 +302,26 @@ Verificado en el navegador: clic en "Editar" convierte la burbuja de
 misma burbuja pasa a mostrar el texto nuevo y recibe su respuesta — la
 conversación sigue teniendo 2 mensajes, no 3.
 
+### Sidebar de conversaciones con las primitivas oficiales de shadcn
+
+La barra lateral era un `<nav>` a mano, `hidden md:flex`: sin forma de
+ocultarla en desktop y sin ninguna versión para pantallas angostas. Se
+reemplazó por `Sidebar`/`SidebarProvider`/`SidebarTrigger` de shadcn
+(`npx shadcn add sidebar`, que de paso trajo `sheet`, `tooltip`, `input`,
+`skeleton` como dependencias) en vez de escribir la animación a mano.
+
+- [x] Botón de alternar (ícono junto al título "Luis") con la animación
+  de deslizamiento ya incluida en el componente — verificado con
+  Playwright: 1er clic → `data-state="collapsed"`, 2do clic →
+  `"expanded"`, cero errores de consola.
+- [x] En pantallas angostas pasa a ser un overlay (`Sheet`) en vez de no
+  existir, que era el comportamiento anterior — la lista de
+  conversaciones ahora es alcanzable en mobile.
+- [x] Lista de conversaciones migrada a `SidebarMenu`/`SidebarMenuButton`/
+  `SidebarMenuAction`: mismo comportamiento (link real, no botón; borrar
+  con confirmación), ahora con el estado activo/hover que trae el
+  componente en vez de clases manuales.
+
 ### Quinta ronda · catálogo dinámico de Ollama y versiones fijas
 
 A pedido del humano: los modelos de Ollama dejan de declararse a mano en
