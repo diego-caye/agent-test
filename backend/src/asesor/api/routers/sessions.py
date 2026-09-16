@@ -14,6 +14,7 @@ from asesor.api.dtos import (
 )
 from asesor.api.errors import NotFoundError
 from asesor.application.chat_service import ChatService, SessionNotFoundError
+from asesor.application.title_service import TITLE_STATE_KEY
 from asesor.infrastructure.container import Container
 
 router = APIRouter(prefix="/api/v1/sessions", tags=["sessions"])
@@ -41,6 +42,7 @@ async def list_sessions(request: Request, user_id: UserId) -> list[SessionSummar
     summaries = [
         SessionSummary(
             session_id=session.id,
+            titulo=session.state.get(TITLE_STATE_KEY) or None,
             last_update_time=datetime.fromtimestamp(session.last_update_time, tz=UTC),
             etapa=read_dialog_state(session.state).stage.value,
         )
