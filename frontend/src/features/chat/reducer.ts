@@ -44,9 +44,22 @@ export const initialChatState: ChatState = {
   lastUserMessage: null,
 }
 
+// El backend no persiste que un turno falló, solo el intercambio en sí: si el
+// último mensaje guardado es del usuario, no hubo respuesta (el modelo falló,
+// la conexión se cortó a medias, lo que sea). Sin esto, recargar una
+// conversación así de deja el mensaje ahí colgado sin ninguna pista de que se
+// puede reintentar — pasa a verse igual que en una falla en vivo.
+const UNANSWERED_ERROR = 'Esta conversación se quedó sin respuesta. Puedes reintentar.'
+
 export type ChatAction =
   | { type: 'reset' }
-  | { type: 'load'; messages: Message[]; lead: LeadDto | null; etapa: Etapa }
+  | {
+      type: 'load'
+      messages: Message[]
+      lead: LeadDto | null
+      etapa: Etapa
+      unansweredMessage?: string | null
+    }
   | { type: 'user-sent'; content: string }
   | { type: 'turn-start' }
   | { type: 'server'; event: ServerEvent }
@@ -65,6 +78,12 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         messages: action.messages,
         lead: action.lead,
         etapa: action.etapa,
+        ...(action.unansweredMessage
+          ? {
+              lastUserMessage: action.unansweredMessage,
+              error: { message: UNANSWERED_ERROR, retryable: true },
+            }
+          : {}),
       }
 
     case 'user-sent':
