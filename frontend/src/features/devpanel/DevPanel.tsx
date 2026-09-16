@@ -3,6 +3,7 @@ import { X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
+import { Sidebar, SidebarContent, SidebarHeader } from '@/components/ui/sidebar'
 
 import type { LeadDto, TurnMetrics } from '../../api/types'
 import { ETAPA_LABEL, LEAD_FIELDS } from '../chat/labels'
@@ -20,8 +21,8 @@ export function DevPanel({ lead, etapa, metrics, onClose }: Props) {
   const record = (lead ?? {}) as Record<string, unknown>
 
   return (
-    <aside className="bg-card hidden w-70 shrink-0 flex-col gap-4 border-l p-4 lg:flex">
-      <div className="flex items-center justify-between">
+    <Sidebar side="right" collapsible="offcanvas">
+      <SidebarHeader className="flex-row items-center justify-between p-4 pb-0">
         <Label>Panel dev</Label>
         <Button
           type="button"
@@ -33,60 +34,62 @@ export function DevPanel({ lead, etapa, metrics, onClose }: Props) {
         >
           <X aria-hidden="true" />
         </Button>
-      </div>
+      </SidebarHeader>
 
-      <Separator />
+      <SidebarContent className="gap-4 p-4 pt-2">
+        <Separator />
 
-      <section>
-        <Label>Etapa</Label>
-        <Badge variant="secondary" className="mt-1.5">
-          {ETAPA_LABEL[etapa] ?? etapa}
-        </Badge>
-      </section>
+        <section>
+          <Label>Etapa</Label>
+          <Badge variant="secondary" className="mt-1.5">
+            {ETAPA_LABEL[etapa] ?? etapa}
+          </Badge>
+        </section>
 
-      <section>
-        <Label>Ficha del lead</Label>
-        <dl className="mt-1.5 flex flex-col gap-1">
-          {LEAD_FIELDS.map((field) => {
-            const value = record[field.key]
-            return (
-              <div key={field.key} className="flex justify-between gap-2 text-xs">
-                <dt className="text-muted-foreground">{field.label}</dt>
-                <dd className={value ? 'text-foreground' : 'text-muted-foreground'}>
-                  {typeof value === 'string' && value ? value : '—'}
-                </dd>
-              </div>
-            )
-          })}
-        </dl>
-      </section>
-
-      <section>
-        <Label>Último turno</Label>
-        {metrics ? (
-          <dl className="mt-1.5 flex flex-col gap-1 text-xs">
-            <Row label="Latencia" value={`${metrics.latency_ms} ms`} />
-            <Row label="Tokens in" value={String(metrics.tokens_in)} />
-            <Row label="Tokens out" value={String(metrics.tokens_out)} />
-            <Row label="Modelo" value={metrics.model ?? '—'} />
+        <section>
+          <Label>Ficha del lead</Label>
+          <dl className="mt-1.5 flex flex-col gap-1">
+            {LEAD_FIELDS.map((field) => {
+              const value = record[field.key]
+              return (
+                <div key={field.key} className="flex justify-between gap-2 text-xs">
+                  <dt className="text-muted-foreground">{field.label}</dt>
+                  <dd className={value ? 'text-foreground' : 'text-muted-foreground'}>
+                    {typeof value === 'string' && value ? value : '—'}
+                  </dd>
+                </div>
+              )
+            })}
           </dl>
-        ) : (
-          <p className="text-muted-foreground mt-1.5 text-xs">Sin turnos todavía.</p>
-        )}
+        </section>
 
-        {metrics && LANGFUSE_PROJECT && (
-          <Button asChild variant="link" size="xs" className="mt-2 px-0">
-            <a
-              href={`https://cloud.langfuse.com/project/${LANGFUSE_PROJECT}/traces/${metrics.trace_id}`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Ver traza en Langfuse
-            </a>
-          </Button>
-        )}
-      </section>
-    </aside>
+        <section>
+          <Label>Último turno</Label>
+          {metrics ? (
+            <dl className="mt-1.5 flex flex-col gap-1 text-xs">
+              <Row label="Latencia" value={`${metrics.latency_ms} ms`} />
+              <Row label="Tokens in" value={String(metrics.tokens_in)} />
+              <Row label="Tokens out" value={String(metrics.tokens_out)} />
+              <Row label="Modelo" value={metrics.model ?? '—'} />
+            </dl>
+          ) : (
+            <p className="text-muted-foreground mt-1.5 text-xs">Sin turnos todavía.</p>
+          )}
+
+          {metrics && LANGFUSE_PROJECT && (
+            <Button asChild variant="link" size="xs" className="mt-2 px-0">
+              <a
+                href={`https://cloud.langfuse.com/project/${LANGFUSE_PROJECT}/traces/${metrics.trace_id}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Ver traza en Langfuse
+              </a>
+            </Button>
+          )}
+        </section>
+      </SidebarContent>
+    </Sidebar>
   )
 }
 

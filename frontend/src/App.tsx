@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import { SlidersHorizontal, TriangleAlert } from 'lucide-react'
 
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -129,14 +129,23 @@ export default function App() {
         </div>
       </main>
 
-      {showDevPanel && (
+      {/* Proveedor propio, aparte del de la sidebar de conversaciones: cada
+          panel anima su propio ancho/estado, y este solo existe desde lg
+          (igual que antes, cuando el panel ni se montaba por debajo de ese
+          punto de quiebre). */}
+      <SidebarProvider
+        open={showDevPanel}
+        onOpenChange={toggleDevPanel}
+        style={{ '--sidebar-width': '17.5rem' } as CSSProperties}
+        className="hidden lg:contents"
+      >
         <DevPanel
           lead={state.lead}
           etapa={state.etapa}
           metrics={state.metrics}
           onClose={() => toggleDevPanel(false)}
         />
-      )}
+      </SidebarProvider>
     </SidebarProvider>
   )
 }
