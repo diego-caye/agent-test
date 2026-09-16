@@ -1,3 +1,18 @@
+# Un solo archivo para todo el stack. Los servicios opcionales van por perfil,
+# no por archivos de override: así `docker compose up -d` siempre funciona y no
+# hay que recordar una cadena de `-f`.
+#
+#   docker compose up -d                        db + backend + frontend
+#   docker compose --profile local-llm up -d    + Ollama dentro del proyecto
+#
+# El perfil local-llm asume GPU NVIDIA con el container toolkit instalado. Sin
+# GPU (o con Ollama ya corriendo en el host, que es lo habitual en Windows),
+# omite el perfil y deja OLLAMA_API_BASE_CONTAINER apuntando al host.
+#
+# backend y frontend montan el código fuente y recargan solos: editar un .py o
+# un .tsx se ve al instante, sin `--build`. Solo hace falta reconstruir cuando
+# cambian las dependencias (uv.lock, package-lock.json) o los Dockerfile.
+
 name: asesor
 
 services:
@@ -28,12 +43,26 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-asesor}:${POSTGRES_PASSWORD:-asesor}@db:5432/${POSTGRES_DB:-asesor}
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:5190}
       # En .env apunta a localhost, que es lo que usan los scripts del host;
-      # desde el contenedor hay que salir al host.
+      # desde el contenedor hay que salir al host. Con el perfil local-llm,
+      # ponlo a http://ollama:11434.
       OLLAMA_API_BASE: ${OLLAMA_API_BASE_CONTAINER:-http://host.docker.internal:11434}
+      # Vacío = sin --reload (producción). Ver el command de abajo.
+      RELOAD: ${BACKEND_RELOAD-1}
+      # El código vive en el sistema de archivos de Windows: los eventos inotify
+      # no cruzan el bind mount, así que watchfiles tiene que hacer polling.
+      WATCHFILES_FORCE_POLLING: ${WATCH_POLLING:-true}
+    # $$ para que lo expanda la shell del contenedor y no Compose. Una sola
+    # línea a propósito: un salto aquí lo parte en dos comandos y el exec se
+    # queda con el primero, sin --reload.
+    command: ["sh", "-c", "exec uvicorn asesor.main:create_app --factory --host 0.0.0.0 --port 8000 $${RELOAD:+--reload --reload-dir /app/src}"]
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
       - "${BACKEND_PORT:-8090}:8000"
+    volumes:
+      # El paquete se instala en modo editable, así que el contenedor ejecuta
+      # directamente lo que hay aquí montado.
+      - ./backend/src:/app/src
     depends_on:
       db:
         condition: service_healthy
@@ -49,8 +78,16 @@ services:
     build: ./frontend
     environment:
       VITE_API_TARGET: http://backend:8000
+      # Mismo motivo que WATCHFILES_FORCE_POLLING en el backend.
+      VITE_POLLING: ${WATCH_POLLING:-true}
     ports:
       - "${FRONTEND_PORT:-5190}:5173"
+    volumes:
+      # Solo lo que se edita: node_modules se queda el de la imagen.
+      - ./frontend/src:/app/src
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/vite.config.ts:/app/vite.config.ts
+      - ./frontend/tsconfig.json:/app/tsconfig.json
     depends_on:
       backend:
         condition: service_healthy
@@ -66,5 +103,48 @@ services:
       retries: 6
       start_period: 20s
 
+  ollama:
+    profiles: ["local-llm"]
+    image: ollama/ollama:latest
+    environment:
+      # Ollama recorta el contexto en silencio si no se le indica cuánto usar.
+      OLLAMA_CONTEXT_LENGTH: ${OLLAMA_CONTEXT_LENGTH:-16384}
+      OLLAMA_HOST: 0.0.0.0:11434
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # Descarga los modelos una vez y termina. El volumen los conserva.
+  ollama-pull:
+    profiles: ["local-llm"]
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    volumes:
+      - ollama-models:/root/.ollama
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      "ollama pull ${OLLAMA_AGENT_MODEL:-gemma4} &&
+       ollama pull ${OLLAMA_EMBEDDINGS_MODEL:-embeddinggemma}"
+    restart: "no"
+
 volumes:
   dbdata:
+  ollama-models:
