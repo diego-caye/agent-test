@@ -74,3 +74,17 @@ def test_fault_injection_only_active_in_dev() -> None:
 def test_telemetry_disabled_without_langfuse_keys() -> None:
     assert make().telemetry_enabled is False
     assert make(langfuse_public_key="pk", langfuse_secret_key="sk").telemetry_enabled is True
+
+
+@pytest.mark.parametrize(
+    ("raw", "esperado"),
+    [("true", True), ("false", False), ("low", "low"), ("HIGH", "high"), (None, None)],
+)
+def test_ollama_think_se_normaliza(raw: str | None, esperado: object) -> None:
+    # Ollama rechaza la cadena "true": quiere el booleano o un nivel.
+    assert make(**{**OLLAMA, "ollama_think": raw}).ollama_think == esperado
+
+
+def test_ollama_think_rechaza_un_nivel_invalido() -> None:
+    with pytest.raises(ValidationError, match="OLLAMA_THINK"):
+        make(**{**OLLAMA, "ollama_think": "altisimo"})

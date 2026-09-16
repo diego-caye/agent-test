@@ -143,7 +143,16 @@ Adelantada a pedido del humano: sin `GOOGLE_API_KEY`, era lo que desbloqueaba ve
 - [x] KB re-ingerida con `embeddinggemma` y `RAG_MIN_SCORE` calibrado a 0.42
 - [x] Conversación real verificada: saludo, captura de lead, RAG, HITL, guardrails y precios
 
-Medido en una RTX 5080: 1,4–2,2 s por turno conversacional, 12–18 s con tool + RAG, 20–40 s la primera llamada (carga del modelo).
+**Modelo del agente: `gemma4:latest` con `OLLAMA_THINK=low` y contexto 32768, 100% en GPU, 5–10 s por turno.**
+
+Llegar ahí requirió dos arreglos de entorno que no son del código y que están documentados en ADR-003:
+
+1. **`%USERPROFILE%\.wslconfig` con `memory=24GB`.** Sin él, WSL toma el 50% de la RAM del equipo y Docker corre dentro de esa VM: Ollama veía 6 GB de RAM del sistema y `gemma4` fallaba con `model requires more system memory`. Requiere `wsl --shutdown`.
+2. **Liberar la VRAM que otros contenedores retienen ociosos.** Un servicio de síntesis de voz mantenía su modelo cargado (~4,8 GB) aunque no se usara. Los servicios de ML suelen hacer *eager loading* y PyTorch no devuelve al driver la VRAM que libera.
+
+Con ambos, `gemma4` pasó de repartirse 66% a CPU (19 s/turno) a 100% GPU (5–10 s/turno). `ollama ps` es lo que delata el reparto.
+
+Alternativa si no se puede liberar VRAM: `qwen3:4b` con thinking entra en GPU con bastante menos margen y también llama las tres tools.
 
 ## F7 · `feature/feedback-evals` · P1
 

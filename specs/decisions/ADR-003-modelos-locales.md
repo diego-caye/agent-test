@@ -15,18 +15,18 @@ Perfil local por defecto, intercambiable a Gemini cambiando solo variables de en
 
 | Rol | Local | Gemini |
 |---|---|---|
-| Agente | `ollama_chat/qwen3:4b` con `OLLAMA_THINK=low` | `gemini-3.8-flash` |
+| Agente | `ollama_chat/gemma4:latest` con `OLLAMA_THINK=low` | `gemini-3.8-flash` |
 | Guardrail L2 / eval | `ollama_chat/qwen3:4b-instruct` | `gemini-3.5-flash-lite` / `-flash` |
 | Fallback | `ollama_chat/llama3.2:latest` | `gemini-3.7-flash` |
 | Embeddings | `embeddinggemma` (768 dims) | `gemini-embedding-001` |
 
 El agente pasó por tres candidatos antes de quedar fijo, y cada cambio salió de una medición:
 
-1. `gemma4:latest` — no entra en la VRAM libre, se parte a CPU (§ "Elegir el modelo por VRAM libre").
+1. `gemma4:latest` — se repartía a CPU y tardaba 19 s por turno. Parecía no caber en VRAM; la causa real era otra (§ "El modelo local necesita RAM del sistema").
 2. `qwen3:4b-instruct` — rapidísimo (1,2 s) y 100% en GPU, pero **nunca llamaba `guardar_lead`**. Llamaba las otras dos tools, así que no era un problema de cableado: la variante sin razonamiento no decide bien una tool de guardado silencioso.
-3. `qwen3:4b` (con thinking) — llama las tres tools de forma consistente. Es el que queda.
+3. `gemma4:latest` de nuevo, tras corregir el límite de RAM de WSL y liberar VRAM: **100% GPU, 5–10 s por turno y las tres tools funcionando**. Es el que queda.
 
-Gemma 4 sigue documentado como la opción de más calidad para equipos con más VRAM libre.
+`qwen3:4b` (con thinking) queda como alternativa: entra en GPU con mucha menos VRAM libre y también llama las tres tools, a cambio de respuestas más escuetas.
 
 El puerto `EmbeddingsPort` y `build_base_model` aíslan la diferencia: fuera de `container.py` y `config.py`, ninguna capa sabe qué proveedor está activo.
 
@@ -68,27 +68,46 @@ Gemma 4 a veces produce solo razonamiento y ninguna respuesta, lo que dejaba una
 
 `from google.adk.models.lite_llm import LiteLlm` falla con `ImportError` en `google-adk` pelado. Hace falta el extra: `google-adk[extensions]==2.9.1`.
 
-## Elegir el modelo por VRAM libre, no por VRAM instalada
+## El modelo local necesita RAM del sistema, no solo VRAM
 
-Este fue el hallazgo con más impacto práctico. La RTX 5080 tiene 16,3 GB, pero con el escritorio de Windows y el resto de contenedores corriendo, **quedaban ~9,0 GB libres**. `gemma4:latest` ocupa ~10 GB, así que no entraba: Ollama repartió las capas y dejó dos tercios del modelo en CPU.
+Este fue el hallazgo con más impacto, y el diagnóstico inicial fue equivocado: parecía un problema de VRAM y en realidad eran **dos límites distintos apilados**.
 
-El síntoma engaña, porque el modelo *funciona*: responde bien, llama tools, respeta el rol. Solo es lento. `ollama ps` es lo que lo delata, en la columna `PROCESSOR`.
+En una RTX 5080 (16,3 GB) con 31 GB de RAM, `gemma4:latest` (~10 GB) corría dos tercios en CPU y tardaba 19 s por turno. Bajar el contexto no ayudaba. El error real solo apareció al pedirle a Ollama que cargara el modelo de cero:
 
-Medido en la RTX 5080, turno caliente (modelo ya cargado):
+```
+model requires more system memory (6.7 GiB) than is available (6.0 GiB)
+```
 
-| Modelo | `num_ctx` | Latencia | Reparto |
-|---|---|---|---|
-| `qwen3:4b-instruct` | 32768 | **1,2 s** | **100% GPU** |
-| `gemma4:latest` | 8192 | 16,4 s | 67% CPU / 33% GPU |
-| `gemma4:latest` | 16384 | 19,3 s | 66% CPU / 34% GPU |
-| `gemma4:latest` | 32768 | 32,4 s | 64% CPU / 36% GPU |
+**Causa 1 — la VM de WSL.** Docker Desktop en Windows corre sobre WSL2, que sin `.wslconfig` toma por defecto el 50% de la RAM del equipo: 15,2 GB de los 31. Dentro de esa VM, con el resto de contenedores corriendo, a Ollama le quedaban ~6 GB de RAM del sistema, insuficientes para la parte del modelo que no entra en GPU. Los 31 GB del equipo no llegaban a Docker.
 
-Dos conclusiones:
+**Causa 2 — otros procesos reteniendo VRAM.** Otro contenedor del equipo (un servicio de síntesis de voz) mantenía su modelo cargado en GPU aunque estuviera ocioso, ocupando ~4,8 GB. No es un fallo: la mayoría de servicios de ML hacen *eager loading* porque cargar el modelo tarda, y además PyTorch no devuelve al driver la VRAM que libera, se la queda en su pool. Ollama es la excepción: descarga el modelo tras su `keep_alive`.
 
-1. **Un modelo que no entra en VRAM cuesta un orden de magnitud.** No es un ajuste fino: son 1,2 s contra 19 s por turno.
-2. **Ampliar el contexto solo es gratis si el modelo entra.** Subir `num_ctx` agranda el KV cache; con `gemma4` ya desbordado, pasar de 8k a 32k casi duplicó la latencia. Con `qwen3` a 32768 el modelo sigue entero en GPU y no cuesta nada.
+Con `.wslconfig` (`memory=24GB`) y ese contenedor detenido, quedaron 14,2 GB de VRAM libres y **`gemma4` pasó a 100% GPU con 32768 de contexto**.
 
-Por eso el agente es `qwen3:4b-instruct` con 32768 de contexto: entra completo, deja margen para la instrucción (~2,2k tokens), los fragmentos de RAG y el historial.
+| Configuración | Reparto | Latencia por turno |
+|---|---|---|
+| `gemma4`, WSL en 15 GB, otros modelos en GPU | 66% CPU / 34% GPU | 16–32 s |
+| `gemma4`, WSL en 24 GB, VRAM liberada | **100% GPU** | **5–10 s** |
+| `qwen3:4b-instruct` (comparación) | 100% GPU | 1,2 s |
+
+### Cómo diagnosticarlo
+
+`ollama ps` es lo que lo delata: la columna `PROCESSOR` dice si el modelo está entero en GPU o repartido.
+
+```bash
+docker exec <ollama> ollama ps                    # reparto CPU/GPU
+docker exec <ollama> ollama stop <modelo>         # descargar
+docker exec <ollama> nvidia-smi --query-gpu=memory.free --format=csv
+wsl -d docker-desktop -e sh -c "free -h"          # RAM real de la VM
+```
+
+Si el modelo se reparte, revisar **las dos** cosas: VRAM libre y RAM disponible dentro de la VM de WSL.
+
+### Sobre ampliar el contexto
+
+Ampliar `num_ctx` agranda el KV cache. Con el modelo desbordado, subir de 8k a 32k casi duplicaba la latencia; con el modelo entero en GPU sale gratis.
+
+Y ampliarlo es **necesario**, no opcional: los turnos reales de esta aplicación miden entre 2.400 y 9.600 tokens de entrada (instrucción de ~2,2k, tres esquemas de tools, fragmentos de RAG e historial). Con el default de Ollama el prompt se truncaría en silencio, que es lo que produce respuestas incoherentes o cortadas. De ahí `OLLAMA_CONTEXT_LENGTH=32768`.
 
 ### El razonamiento es el precio de que las tools funcionen
 
@@ -106,21 +125,27 @@ Los niveles de razonamiento (`low`, `medium`, `high`) funcionan y resuelven la d
 
 **Camino de mejora si la latencia molesta:** acortar la instrucción del sistema, que es lo que más infla el razonamiento. No se hizo aquí porque la instrucción codifica las frases canned y las reglas del baseline, y recortarla a ciegas arriesga fidelidad con el spec.
 
-### Tabla orientativa por VRAM libre
+### Tabla orientativa
 
-| VRAM libre | Modelo sugerido | Contexto |
-|---|---|---|
-| ~4 GB | `qwen3:4b-instruct` o `llama3.2` | 8192–16384 |
-| ~9 GB | `qwen3:4b-instruct` | 32768 |
-| ~14 GB | `gemma4:latest` | 16384 |
-| 24 GB o más | `gemma4` de mayor tamaño | 32768 |
+Medir con el modelo descargado, porque lo que importa es lo que queda libre, no lo instalado.
 
-Antes de fijar el modelo conviene medir lo que de verdad hay libre, con el modelo descargado:
+| VRAM libre | RAM libre en la VM de WSL | Modelo sugerido | Contexto |
+|---|---|---|---|
+| ~4 GB | 4 GB | `llama3.2` | 8192 |
+| ~9 GB | 8 GB | `qwen3:4b` | 32768 |
+| ~14 GB | 16 GB | `gemma4:latest` | 32768 |
+| 24 GB o más | 24 GB | `gemma4` de mayor tamaño | 32768 |
 
-```bash
-docker exec <ollama> ollama stop <modelo>
-docker exec <ollama> nvidia-smi --query-gpu=memory.free --format=csv
+En Windows, además del modelo hay que dimensionar la VM de WSL en `%USERPROFILE%\.wslconfig`:
+
+```ini
+[wsl2]
+memory=24GB
+swap=8GB
+autoMemoryReclaim=gradual
 ```
+
+Los cambios requieren `wsl --shutdown`, que reinicia todos los contenedores. Los que tengan `restart: unless-stopped` vuelven solos.
 
 ### 8. Los modelos pequeños escriben la llamada en vez de emitirla
 

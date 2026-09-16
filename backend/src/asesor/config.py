@@ -2,8 +2,10 @@ from enum import StrEnum
 from functools import lru_cache
 from typing import Self
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+OLLAMA_THINK_LEVELS = frozenset({"low", "medium", "high", "max"})
 
 
 class AppEnv(StrEnum):
@@ -51,6 +53,31 @@ class Settings(BaseSettings):
     # activo, así que no es opcional con ellos; "low" da el mismo tool-calling
     # que true a menos de la mitad de latencia (spec 05 §3, ADR-003).
     ollama_think: bool | str | None = None
+
+    @field_validator("ollama_think", mode="before")
+    @classmethod
+    def _normalize_think(cls, value: object) -> object:
+        """Ollama acepta el booleano o un nivel, pero no la cadena "true".
+
+        Sin esto, OLLAMA_THINK=true llega como el string "true" y la API
+        responde: invalid think value (must be high, medium, low, max, true,
+        or false).
+        """
+        if not isinstance(value, str):
+            return value
+
+        lowered = value.strip().lower()
+        if lowered in {"true", "1", "yes"}:
+            return True
+        if lowered in {"false", "0", "no"}:
+            return False
+        if lowered in OLLAMA_THINK_LEVELS:
+            return lowered
+
+        raise ValueError(
+            f"OLLAMA_THINK debe ser true, false o un nivel "
+            f"({', '.join(sorted(OLLAMA_THINK_LEVELS))}); recibido: {value!r}"
+        )
 
     agent_model: str
     guardrail_model: str
