@@ -1,3 +1,5 @@
+import { Brain, Wrench } from 'lucide-react'
+
 import { Badge } from '@/components/ui/badge'
 import {
   Select,
@@ -48,11 +50,25 @@ export function ModelSelect({ models, value, disabled, onChange }: Props) {
           // Las opciones sin configurar se muestran deshabilitadas en vez de
           // ocultarse: así se ve qué hay disponible y por qué no se puede usar.
           <SelectItem key={model.id} value={model.id} disabled={!model.available}>
-            <span className="flex items-center gap-2">
+            <span className="flex items-center gap-1.5">
               {model.label}
               <Badge variant="outline" className="text-[10px]">
                 {PROVIDER_LABEL[model.provider] ?? model.provider}
               </Badge>
+              {/* Capacidades reales del modelo, descubiertas contra Ollama
+                  (/api/show) para las opciones locales — no todas las
+                  variantes del mismo modelo las tienen por igual: qwen3:4b
+                  piensa y qwen3:4b-instruct no, por ejemplo. */}
+              {model.supports_thinking && (
+                <Brain className="text-muted-foreground size-3" aria-hidden="true">
+                  <title>Puede razonar antes de responder</title>
+                </Brain>
+              )}
+              {model.supports_tools && (
+                <Wrench className="text-muted-foreground size-3" aria-hidden="true">
+                  <title>Puede usar las herramientas del asesor</title>
+                </Wrench>
+              )}
               {!model.available && (
                 <span className="text-muted-foreground text-[10px]">sin configurar</span>
               )}
