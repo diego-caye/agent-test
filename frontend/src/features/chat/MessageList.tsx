@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import type { Activity, Message } from './reducer'
 import { TOOL_ACTIVITY } from './labels'
@@ -6,14 +6,20 @@ import { TOOL_ACTIVITY } from './labels'
 type Props = {
   messages: Message[]
   activity: Activity[]
+  streaming: boolean
 }
 
-export function MessageList({ messages, activity }: Props) {
+export function MessageList({ messages, activity, streaming }: Props) {
   const endRef = useRef<HTMLDivElement>(null)
+
+  // El texto llega en un solo evento ya filtrado por L4, así que entre el envío
+  // y la respuesta no hay burbuja que mostrar. Sin este indicador la interfaz
+  // se ve congelada, y con un modelo local en frío eso son decenas de segundos.
+  const pendingReply = streaming && messages.at(-1)?.role !== 'agent'
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end' })
-  }, [messages, activity])
+  }, [messages, activity, streaming])
 
   return (
     <div
@@ -31,6 +37,8 @@ export function MessageList({ messages, activity }: Props) {
           .map((item) => (
             <ActivityChip key={item.name} name={item.name} />
           ))}
+
+        {pendingReply && <TypingIndicator />}
 
         <div ref={endRef} />
       </div>
@@ -55,6 +63,42 @@ function Bubble({ message }: { message: Message }) {
         {message.content}
       </p>
     </div>
+  )
+}
+
+const SLOW_REPLY_MS = 8000
+
+function TypingIndicator() {
+  const [slow, setSlow] = useState(false)
+
+  useEffect(() => {
+    const timer = setTimeout(() => setSlow(true), SLOW_REPLY_MS)
+    return () => clearTimeout(timer)
+  }, [])
+
+  return (
+    <div className="flex flex-col items-start gap-1.5" role="status" aria-label="Luis está escribiendo">
+      <span className="inline-flex items-center gap-1.5 rounded-[14px] rounded-bl-[4px] bg-panel px-4 py-3">
+        <Dot delay="0ms" />
+        <Dot delay="160ms" />
+        <Dot delay="320ms" />
+      </span>
+      {slow && (
+        <span className="px-1 text-xs text-muted">
+          El modelo local está cargando, suele tardar la primera vez…
+        </span>
+      )}
+    </div>
+  )
+}
+
+function Dot({ delay }: { delay: string }) {
+  return (
+    <span
+      className="size-1.5 animate-bounce rounded-full bg-muted"
+      style={{ animationDelay: delay }}
+      aria-hidden="true"
+    />
   )
 }
 
