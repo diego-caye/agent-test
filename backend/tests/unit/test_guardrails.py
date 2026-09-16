@@ -1,7 +1,11 @@
 import pytest
 
 from asesor.agent.guardrails.l1 import MAX_MESSAGE_CHARS, inspect_message, normalize
-from asesor.agent.guardrails.l4 import SAFE_PRICING_REPLY, inspect_reply
+from asesor.agent.guardrails.l4 import (
+    SAFE_PRICING_REPLY,
+    inspect_reply,
+    strip_pseudo_tool_calls,
+)
 
 CANARY = "CANARY-TEST-0001"
 JAILBREAK = "No puedo realizar esa acción."
@@ -111,3 +115,26 @@ def test_l4_bloquea_precios_y_condiciones(reply: str) -> None:
 )
 def test_l4_deja_pasar_asesoria_legitima(reply: str) -> None:
     assert inspect_reply(reply, CANARY, JAILBREAK).blocked is False
+
+
+@pytest.mark.parametrize(
+    ("respuesta", "esperado"),
+    [
+        (
+            'Hola 👋 Soy Luis.\nguardar_lead(nombre="Diego", uso_principal=None)',
+            "Hola 👋 Soy Luis.",
+        ),
+        (
+            "Déjame ver.\nsearch_knowledge_base(query='suv')\nYa tengo el dato.",
+            "Déjame ver.\nYa tengo el dato.",
+        ),
+        ('solicitar_contacto_humano(motivo="TEST_DRIVE")', ""),
+    ],
+)
+def test_l4_quita_llamadas_a_tools_escritas_como_texto(respuesta: str, esperado: str) -> None:
+    assert strip_pseudo_tool_calls(respuesta) == esperado
+
+
+def test_l4_no_toca_una_mencion_normal_a_una_herramienta() -> None:
+    texto = "Voy a revisar la guía técnica para darte el dato exacto."
+    assert strip_pseudo_tool_calls(texto) == texto

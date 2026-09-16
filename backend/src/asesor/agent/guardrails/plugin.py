@@ -10,7 +10,7 @@ from google.adk.tools.tool_context import ToolContext
 from google.genai import types
 
 from asesor.agent.guardrails.l1 import inspect_message
-from asesor.agent.guardrails.l4 import inspect_reply
+from asesor.agent.guardrails.l4 import inspect_reply, strip_pseudo_tool_calls
 from asesor.agent.instruction import CANNED_JAILBREAK
 from asesor.agent.parts import visible_text
 from asesor.agent.tools.envelope import error
@@ -87,6 +87,13 @@ class GuardrailPlugin(BasePlugin):
         text = visible_text(llm_response.content)
         if not text:
             return None
+
+        cleaned = strip_pseudo_tool_calls(text)
+        if cleaned != text:
+            logger.warning("el modelo escribió una llamada a tool como texto")
+            if not cleaned:
+                return None
+            return _canned(cleaned, "L4", "pseudo_tool_call")
 
         verdict = inspect_reply(text, self._canary_token, CANNED_JAILBREAK)
         if not verdict.blocked or verdict.replacement is None:

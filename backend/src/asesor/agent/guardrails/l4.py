@@ -21,11 +21,28 @@ _PRICING_PATTERNS: tuple[re.Pattern[str], ...] = (
 )
 
 
+TOOL_NAMES = ("guardar_lead", "solicitar_contacto_humano", "search_knowledge_base")
+
+# Los modelos pequeños a veces "escriben" la llamada en vez de emitirla como
+# function call. El texto queda en pantalla y la tool nunca se ejecuta. Visto
+# con Gemma 4 vía Ollama (ADR-003).
+_PSEUDO_TOOL_CALL = re.compile(
+    r"^\s*(?:" + "|".join(TOOL_NAMES) + r")\s*\([^)]*\)\s*$",
+    re.MULTILINE,
+)
+
+
 @dataclass(frozen=True, slots=True)
 class L4Verdict:
     blocked: bool
     category: str | None = None
     replacement: str | None = None
+
+
+def strip_pseudo_tool_calls(text: str) -> str:
+    """Quita las llamadas a tools que el modelo escribió como texto."""
+    without = _PSEUDO_TOOL_CALL.sub("", text)
+    return re.sub(r"\n{2,}", "\n", without).strip()
 
 
 def _fold(text: str) -> str:
