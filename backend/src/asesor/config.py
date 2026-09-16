@@ -33,12 +33,21 @@ class EmbeddingsProviderName(StrEnum):
 
 
 class ModelChoice(BaseModel):
-    """Una opción del selector de modelos de la interfaz."""
+    """Una opción del selector de modelos de la interfaz.
+
+    supports_tools/supports_thinking son True por defecto (para las entradas
+    declaradas a mano, típicamente Gemini): se asume que el modelo configurado
+    las tiene, salvo que se diga lo contrario. Las entradas de Ollama no se
+    declaran a mano — infrastructure.container las descubre en vivo contra
+    /api/show y pone aquí el valor real (spec 11 §Modelos locales).
+    """
 
     id: str
     label: str
     provider: LlmProviderName
     model: str
+    supports_tools: bool = True
+    supports_thinking: bool = True
 
 
 class Settings(BaseSettings):
@@ -139,30 +148,11 @@ class Settings(BaseSettings):
     def gemini_usable(self) -> bool:
         return bool(self.google_api_key or self.google_genai_use_vertexai)
 
-    @property
-    def default_model_id(self) -> str:
-        return self.model_choices[0].id if self.model_choices else DEFAULT_MODEL_ID
-
-    def catalog(self) -> list[ModelChoice]:
-        """Opciones ofrecidas; si no hay catálogo, la única es AGENT_MODEL."""
-        if self.model_choices:
-            return self.model_choices
-
-        return [
-            ModelChoice(
-                id=DEFAULT_MODEL_ID,
-                label=self.agent_model,
-                provider=self.llm_provider,
-                model=self.agent_model,
-            )
-        ]
-
-    def choice(self, model_id: str | None) -> ModelChoice:
-        wanted = model_id or self.default_model_id
-        for option in self.catalog():
-            if option.id == wanted:
-                return option
-        raise UnknownModelError(wanted)
+    # El catálogo (qué opciones hay, cuál es la de por defecto, resolver un
+    # id a una opción) vive en infrastructure.container.RunnerRegistry, no
+    # aquí: incluye lo que Ollama reporta tener instalado en vivo, y eso es
+    # estado descubierto en el arranque, no configuración estática. Settings
+    # se queda con lo que sí es puramente declarativo.
 
     def is_usable(self, option: ModelChoice) -> bool:
         """Gemini necesita credenciales; los locales solo que Ollama responda."""

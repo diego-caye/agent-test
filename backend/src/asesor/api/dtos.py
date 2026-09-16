@@ -53,6 +53,8 @@ class ModelOption(BaseModel):
     model: str
     available: bool
     is_default: bool
+    supports_tools: bool
+    supports_thinking: bool
 
 
 class ConfirmationRequest(BaseModel):
