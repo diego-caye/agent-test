@@ -154,6 +154,26 @@ Con ambos, `gemma4` pasó de repartirse 66% a CPU (19 s/turno) a 100% GPU (5–1
 
 Alternativa si no se puede liberar VRAM: `qwen3:4b` con thinking entra en GPU con bastante menos margen y también llama las tres tools.
 
+## UX de modelos y conversaciones · `feature/ux-modelos-shadcn` · pedida por el humano
+
+Fuera del plan de fases original; se hizo sobre F6 porque es lo que vuelve
+demostrable el trabajo de los modelos locales en el vídeo.
+
+- [x] `GET /api/v1/models` y `model_id` por turno, con un `Runner` por modelo
+- [x] Selector de modelo en la cabecera (Gemma 4 / Qwen3 / Gemini)
+- [x] Título de conversación generado en segundo plano con `GUARDRAIL_MODEL`
+- [x] shadcn/ui como base de componentes, con la paleta reexpresada en sus tokens
+- [x] Un único `docker-compose.yml` y recarga en caliente de backend y frontend
+- [x] L4: pseudo-llamadas a tools con llaves o prefijo (`llama:guardar_lead{…}`)
+
+Verificado el 2026-09-15 en el navegador: 152 tests de backend y 17 de frontend
+en verde, mypy strict limpio, sin errores de consola y sin scroll horizontal a
+390px. El cambio de modelo a media conversación conserva historial y lead.
+
+El modelo se elige **por turno y no por sesión**: la conversación vive en
+`DatabaseSessionService`, así que cambiarlo a media charla no pierde nada. Es la
+forma más directa de enseñar el mismo caso con los tres modelos.
+
 ## F7 · `feature/feedback-evals` · P1
 
 DoD: scores visibles en Langfuse; evalset corre.
