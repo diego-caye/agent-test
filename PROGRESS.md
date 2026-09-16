@@ -343,12 +343,13 @@ verde, `GET /api/v1/models` devuelve 5 opciones (4 de Ollama descubiertas
 + Gemini), `embeddinggemma` correctamente ausente, capacidades distintas
 por variante confirmadas.
 
-**Pendiente, sin ejecutar en esta sesión:** una descarga limpia con
-`docker compose --profile local-llm up -d` usando los tags nuevos
-(`gemma4:12b` en vez del `gemma4:latest` de 8B ya afinado en esta
-máquina) — implica bajar varios GB y no se hizo sin pedirlo. Antes de
-confiar en ese perfil para la demo, correr `ollama ps` y repetir el
-ajuste de VRAM/contexto de ADR-003 si hace falta.
+**Verificado con una descarga limpia real**, a pedido del humano: `ollama/ollama:0.24.0` no alcanzaba — `gemma4:12b` necesita Ollama ≥0.30.3 (≥0.30.5 para evitar un crash conocido de esa variante), y `pulling manifest: 412 requires a newer version of Ollama` lo confirmó en la práctica. Se subió el pin a `ollama/ollama:0.34.0` (última estable al momento de fijarlo) y se repitió la descarga:
+
+- `docker exec asesor-ollama-1 ollama list` → los 4 modelos, con los tags exactos de `.env.example`.
+- `discover_ollama_models("http://localhost:11435")` (la función real, no una simulación) contra ese Ollama recién bajado → 3 modelos de chat (`embeddinggemma:300m` correctamente ausente), con `supports_tools`/`supports_thinking` reales.
+- Dato curioso que confirma por qué esto se descubre en vivo y no se asume: `qwen3:4b-instruct` reportó `thinking=True` en 0.34.0 pero `thinking=False` en la instalación nativa de esta máquina (0.24.0) — la propia versión del motor puede cambiar cómo reporta las capacidades del mismo modelo.
+
+Contenedores `ollama`/`ollama-pull` parados tras la verificación (no borrados: el volumen conserva los modelos, así que `docker compose --profile local-llm up -d` los trae de vuelta sin volver a descargar nada). Sigue pendiente, y sí hace falta si se usa este perfil para la demo: correr `ollama ps` y repetir el ajuste de VRAM/contexto de ADR-003, que está medido contra la instalación nativa, no contra esta.
 
 ## F7 · `feature/feedback-evals` · P1
 
