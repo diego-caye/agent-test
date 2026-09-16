@@ -73,7 +73,7 @@ Sin mayúsculas forzadas salvo en las etiquetas del panel dev, donde ayudan a se
    240px            flexible              280px
 ```
 
-- **Sidebar (240px).** Botón "Nueva conversación" y lista de sesiones con su etapa. Se colapsa bajo 900px a un botón en la cabecera.
+- **Sidebar (240px).** Botón "Nueva conversación" y lista de sesiones con su etapa. Cada fila tiene un icono de papelera que aparece al pasar el cursor (y con foco de teclado); al pulsarlo, la fila ofrece "Borrar / No" en vez de abrir un diálogo modal, que para esta acción sería desproporcionado. Se colapsa bajo 900px a un botón en la cabecera.
 - **Panel de chat (flexible).** Cabecera fina con el nombre del agente y el estado de conexión; lista de mensajes; campo de entrada anclado abajo.
 - **Panel dev (280px, plegable).** Ficha del lead y etapa en vivo, latencia y tokens del último turno, link a la traza en Langfuse. Se pliega con un botón y su estado se recuerda en `localStorage`.
 
@@ -86,7 +86,9 @@ Bajo 900px el panel dev se oculta por completo y la sidebar pasa a un drawer. Ba
 ### Burbuja de mensaje
 Agente a la izquierda sobre `--panel`, usuario a la derecha sobre `--user-bubble`. Radio 14px con la esquina del lado del hablante a 4px. Sin avatar: el alineamiento ya distingue quién habla.
 
-**Sobre el streaming (revisado en F6).** El texto del agente llega en un solo evento, no token a token. No es una simplificación: el filtro de salida L4 necesita ver la respuesta completa antes de que salga, y un delta ya transmitido no se puede retirar del navegador — razonado en `specs/02-api-contract.md` §4. Lo que sí ocurre en vivo, y es de donde viene la sensación de que el asesor está trabajando, son los chips de actividad de las tools, la ficha del lead y la tarjeta HITL. Mientras se espera la respuesta, el cursor de bloque parpadea al final de la burbuja (fijo con `prefers-reduced-motion`).
+**Sobre el streaming (revisado en F6).** El texto del agente llega en un solo evento, no token a token. No es una simplificación: el filtro de salida L4 necesita ver la respuesta completa antes de que salga, y un delta ya transmitido no se puede retirar del navegador — razonado en `specs/02-api-contract.md` §4. Lo que sí ocurre en vivo, y es de donde viene la sensación de que el asesor está trabajando, son los chips de actividad de las tools, la ficha del lead y la tarjeta HITL.
+
+**Indicador de escritura.** Como la burbuja del agente no existe hasta que llega la respuesta completa, entre el envío y la respuesta no habría nada en pantalla: con un modelo local en frío eso son decenas de segundos y la interfaz parece colgada. Tres puntos animados ocupan ese hueco desde el primer instante, y a los 8 segundos se añade una línea explicando que el modelo local está cargando. Respeta `prefers-reduced-motion`.
 
 ### Chip de actividad
 Línea propia, fondo `--accent-soft`, texto `--text-muted`, punto ámbar a la izquierda. Aparece al recibir `tool.started` y se resuelve al llegar `tool.finished`.

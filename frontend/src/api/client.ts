@@ -25,6 +25,7 @@ function headers(): HeadersInit {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, { ...init, headers: headers() })
   if (!response.ok) throw new Error(`${init?.method ?? 'GET'} ${path} → ${response.status}`)
+  if (response.status === 204) return undefined as T
   return (await response.json()) as T
 }
 
@@ -34,6 +35,8 @@ export const api = {
   listMessages: (sessionId: string) =>
     request<MessageDto[]>(`/api/v1/sessions/${sessionId}/messages`),
   getLead: (sessionId: string) => request<LeadResponse>(`/api/v1/sessions/${sessionId}/lead`),
+  deleteSession: (sessionId: string) =>
+    request<void>(`/api/v1/sessions/${sessionId}`, { method: 'DELETE' }),
 }
 
 async function* streamEvents(

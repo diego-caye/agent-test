@@ -92,6 +92,21 @@ export function useChat() {
     [sessionId, state.pendingConfirmation, consume, refreshSessions],
   )
 
+  const removeSession = useCallback(
+    async (id: string) => {
+      await api.deleteSession(id)
+
+      if (id === sessionId) {
+        abortRef.current?.abort()
+        setSessionId(null)
+        dispatch({ type: 'reset' })
+      }
+
+      await refreshSessions()
+    },
+    [sessionId, refreshSessions],
+  )
+
   const retry = useCallback(async () => {
     if (state.lastUserMessage) await send(state.lastUserMessage)
   }, [state.lastUserMessage, send])
@@ -101,5 +116,15 @@ export function useChat() {
     return () => abortRef.current?.abort()
   }, [refreshSessions])
 
-  return { state, sessions, sessionId, send, retry, createSession, openSession, answerConfirmation }
+  return {
+    state,
+    sessions,
+    sessionId,
+    send,
+    retry,
+    createSession,
+    openSession,
+    removeSession,
+    answerConfirmation,
+  }
 }
