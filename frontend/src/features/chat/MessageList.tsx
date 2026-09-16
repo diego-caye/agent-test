@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
+import { RotateCcw } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 
 import type { Activity, Message } from './reducer'
 import { TOOL_ACTIVITY } from './labels'
@@ -9,15 +11,20 @@ type Props = {
   messages: Message[]
   activity: Activity[]
   streaming: boolean
+  // Se ofrece reintentar cuando el último turno no llegó a tener respuesta,
+  // sea por un fallo en vivo o porque se cargó así una conversación vieja.
+  retryable: boolean
+  onRetry: () => void
 }
 
-export function MessageList({ messages, activity, streaming }: Props) {
+export function MessageList({ messages, activity, streaming, retryable, onRetry }: Props) {
   const endRef = useRef<HTMLDivElement>(null)
+  const lastMessage = messages.at(-1)
 
   // El texto llega en un solo evento ya filtrado por L4, así que entre el envío
   // y la respuesta no hay burbuja que mostrar. Sin este indicador la interfaz
   // se ve congelada, y con un modelo local en frío eso son decenas de segundos.
-  const pendingReply = streaming && messages.at(-1)?.role !== 'agent'
+  const pendingReply = streaming && lastMessage?.role !== 'agent'
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end' })
@@ -31,7 +38,15 @@ export function MessageList({ messages, activity, streaming }: Props) {
     >
       <div className="mx-auto flex max-w-2xl flex-col gap-3">
         {messages.map((message) => (
-          <Bubble key={message.id} message={message} />
+          <Bubble
+            key={message.id}
+            message={message}
+            // Solo el último mensaje puede necesitar reintento: es el único
+            // que se quedó sin respuesta. Uno de en medio ya la tiene.
+            showRetry={retryable && message.id === lastMessage?.id}
+            retryDisabled={streaming}
+            onRetry={onRetry}
+          />
         ))}
 
         {activity
@@ -48,11 +63,21 @@ export function MessageList({ messages, activity, streaming }: Props) {
   )
 }
 
-function Bubble({ message }: { message: Message }) {
+function Bubble({
+  message,
+  showRetry,
+  retryDisabled,
+  onRetry,
+}: {
+  message: Message
+  showRetry: boolean
+  retryDisabled: boolean
+  onRetry: () => void
+}) {
   const isUser = message.role === 'user'
 
   return (
-    <div className={isUser ? 'flex justify-end' : 'flex justify-start'}>
+    <div className={isUser ? 'flex flex-col items-end' : 'flex flex-col items-start'}>
       <p
         className={[
           'max-w-[92%] px-4 py-2.5 text-[15px] leading-relaxed whitespace-pre-wrap sm:max-w-[80%]',
@@ -64,6 +89,22 @@ function Bubble({ message }: { message: Message }) {
       >
         {message.content}
       </p>
+
+      {/* Ícono junto al mensaje concreto que se reenvía, no un botón grande
+          y ambiguo al pie de la pantalla que no deja claro qué reintenta. */}
+      {showRetry && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="xs"
+          onClick={onRetry}
+          disabled={retryDisabled}
+          className="text-muted-foreground hover:text-foreground mt-1"
+        >
+          <RotateCcw aria-hidden="true" />
+          Reintentar
+        </Button>
+      )}
     </div>
   )
 }

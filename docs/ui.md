@@ -101,6 +101,8 @@ Agente a la izquierda sobre `--card`, usuario a la derecha sobre `--color-user-b
 
 **Indicador de escritura.** Como la burbuja del agente no existe hasta que llega la respuesta completa, entre el envío y la respuesta no habría nada en pantalla: con un modelo local en frío eso son decenas de segundos y la interfaz parece colgada. Tres puntos animados ocupan ese hueco desde el primer instante, y a los 8 segundos se añade una línea explicando que el modelo local está cargando. Respeta `prefers-reduced-motion`.
 
+**Reintentar (bajo el mensaje, no al pie de la pantalla).** Cuando el último mensaje se quedó sin respuesta, el mensaje del usuario que corresponde muestra un botón de texto pequeño "↻ Reintentar" justo debajo — nunca en medio de la conversación, solo en el último, porque es el único que puede necesitarlo. Reenvía ese mismo texto sin duplicar la burbuja. Antes vivía como un botón grande al pie de la pantalla junto al banner de error; con más de un mensaje en la conversación no quedaba claro qué iba a reintentar, así que se movió a pegado al mensaje concreto.
+
 ### Chip de actividad
 Línea propia, fondo `--color-accent-soft`, texto `--muted-foreground`, punto en `--primary` a la izquierda. Aparece al recibir `tool.started` y se resuelve al llegar `tool.finished`.
 
@@ -122,7 +124,7 @@ En la cabecera, a la izquierda del botón del panel dev. Un `Select` que lista e
 Lo genera `GUARDRAIL_MODEL` (el modelo pequeño) a partir del primer mensaje del usuario, en segundo plano y después del turno, para no sumarle latencia a la respuesta. De tres a seis palabras, máximo 48 caracteres. Si el modelo devuelve algo inservible se usa el propio mensaje recortado: una conversación siempre tiene que poder distinguirse de las demás en la lista.
 
 ### Error
-Banda sobre el campo de entrada, borde `--destructive`. Texto que dice qué pasó y qué hacer y un botón "Reintentar" que reenvía el último mensaje. Se dispara en tres casos: el backend manda un evento `error`; la conexión SSE se corta sin ningún evento de cierre (crash del backend, red caída — no hay forma de distinguirlo de un turno legítimo salvo notando que nunca llegó nada definitivo); o el turno queda en silencio total más de tres minutos, que es el timeout de inactividad del lado del cliente. Los tres casos usan el mismo componente porque desde el punto de vista de quien espera una respuesta son el mismo problema: no llegó nada y hay que poder reintentar sin recargar la página.
+Banda sobre el campo de entrada, borde `--destructive`, solo con el texto de qué pasó — sin botón propio. El botón "Reintentar" vive junto al mensaje concreto que se reenvía (ver Burbuja de mensaje), no aquí: uno solo al pie de la pantalla no dejaba claro qué se iba a reintentar cuando ya había varios mensajes en la conversación. Se dispara en tres casos: el backend manda un evento `error`; la conexión SSE se corta sin ningún evento de cierre (crash del backend, red caída — no hay forma de distinguirlo de un turno legítimo salvo notando que nunca llegó nada definitivo); o el turno queda en silencio total más de tres minutos, que es el timeout de inactividad del lado del cliente. Los tres casos usan la misma señal porque desde el punto de vista de quien espera una respuesta son el mismo problema: no llegó nada y hay que poder reintentar sin recargar la página.
 
 ### Panel dev
 Ficha del lead campo por campo (los vacíos en `--muted-foreground` con un guion), etapa como insignia, y del último turno: latencia en ms, tokens in/out y link a la traza si hay `LANGFUSE_PROJECT_ID`. El selector de fault injection se añade en F6, junto con la funcionalidad que lo respalda.
@@ -133,6 +135,11 @@ Cada conversación vive en su propia URL, `/c/:id`, navegable de verdad: se pued
 El botón "Nueva conversación" solo vuelve al borrador (`/`) y limpia el estado local; no llama a la API. La sesión se crea recién cuando se envía el primer mensaje de verdad, así que un clic repetido en el botón no dejaba una fila vacía por clic — ni tampoco al recargar la página con el borrador sin usar, que era la causa real de la acumulación de "Conversación nueva" en la barra lateral (dos correcciones previas habían tapado sólo dos síntomas del mismo problema: los clics simultáneos y los clics normales repetidos, pero no la creación anticipada en sí).
 
 Al entrar directo a `/c/:id` (un link, un refresh, atrás/adelante del navegador) se carga esa conversación; si el `id` no existe o no es de este usuario, se cae al borrador en vez de dejar la pantalla colgada.
+
+### Conversación que se quedó sin respuesta
+El backend no persiste que un turno falló, solo el intercambio en sí (guardar un "esto no funcionó" complicaría el modelo de datos por algo que ADK ya resuelve dejando, sencillamente, nada escrito). Si al cargar una conversación el último mensaje guardado es del usuario, no hubo respuesta — el modelo falló, la conexión se cortó a medias, lo que sea. Se reconstruye la misma señal de reintento que un fallo en vivo: aparece el ícono "Reintentar" bajo ese mensaje y reenvía su texto a la misma conversación, sin duplicar la burbuja que ya está en pantalla.
+
+Motivo real detrás de esto, encontrado inspeccionando la base de datos en vivo: un turno cuya conexión se corta a medias hace que ADK cancele la tarea del agente (`Root node <agent> was cancelled`) antes de escribir ningún evento — ni siquiera uno de error. Antes de este arreglo, recargar una conversación así dejaba el mensaje del usuario ahí colgado sin ninguna pista de que se podía reintentar.
 
 ## 6. Accesibilidad y calidad
 

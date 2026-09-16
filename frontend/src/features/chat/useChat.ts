@@ -69,18 +69,25 @@ export function useChat() {
   // del navegador) puedan reusar la misma carga de mensajes y ficha.
   const loadSessionData = useCallback(async (id: string) => {
     const [messages, lead] = await Promise.all([api.listMessages(id), api.getLead(id)])
+    const mapped = messages.map(
+      (message, index): Message => ({
+        id: `stored-${index}`,
+        role: message.role === 'user' ? 'user' : 'agent',
+        content: message.content,
+        streaming: false,
+      }),
+    )
+    // Si la conversación termina en un mensaje del usuario, ese turno nunca
+    // tuvo respuesta (el backend no persiste que un turno falló, solo el
+    // intercambio en sí). Se reconstruye la señal de "hay que reintentar"
+    // para que no quede ahí colgado sin ninguna explicación al recargar.
+    const last = mapped.at(-1)
     dispatch({
       type: 'load',
-      messages: messages.map(
-        (message, index): Message => ({
-          id: `stored-${index}`,
-          role: message.role === 'user' ? 'user' : 'agent',
-          content: message.content,
-          streaming: false,
-        }),
-      ),
+      messages: mapped,
       lead: lead.lead,
       etapa: lead.etapa as never,
+      unansweredMessage: last?.role === 'user' ? last.content : null,
     })
   }, [])
 
@@ -159,9 +166,13 @@ export function useChat() {
   }, [setSessionId])
 
   const send = useCallback(
-    async (text: string) => {
+    // echo=false para reintentar: el mensaje que se reenvía ya está en
+    // pantalla (recién escrito, o recuperado del historial de una
+    // conversación que se quedó sin respuesta), así que agregarlo nuevamente
+    // solo lo duplicaría en la lista.
+    async (text: string, { echo = true }: { echo?: boolean } = {}) => {
       const id = sessionId ?? (await createSession())
-      dispatch({ type: 'user-sent', content: text })
+      if (echo) dispatch({ type: 'user-sent', content: text })
 
       const controller = new AbortController()
       abortRef.current = controller
@@ -202,7 +213,7 @@ export function useChat() {
   )
 
   const retry = useCallback(async () => {
-    if (state.lastUserMessage) await send(state.lastUserMessage)
+    if (state.lastUserMessage) await send(state.lastUserMessage, { echo: false })
   }, [state.lastUserMessage, send])
 
   // Vuelve a leer la URL al usar atrás/adelante del navegador: pushState (en

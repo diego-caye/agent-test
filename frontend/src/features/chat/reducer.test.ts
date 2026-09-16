@@ -143,4 +143,39 @@ describe('chatReducer', () => {
     expect(state.messages).toEqual([])
     expect(state.error?.message).toBe('se cayó')
   })
+
+  it('ofrece reintentar al cargar una conversación que terminó sin respuesta', () => {
+    const state = chatReducer(initialChatState, {
+      type: 'load',
+      messages: [
+        { id: 'stored-0', role: 'user', content: 'hola', streaming: false },
+        { id: 'stored-1', role: 'user', content: 'q tal?', streaming: false },
+      ],
+      lead: null,
+      etapa: 'NUEVO',
+      unansweredMessage: 'q tal?',
+    })
+
+    expect(state.error?.retryable).toBe(true)
+    expect(state.lastUserMessage).toBe('q tal?')
+    // El mensaje sigue en la lista tal cual venía del backend: la señal de
+    // "hay que reintentar" es aparte, no reemplaza el historial.
+    expect(state.messages).toHaveLength(2)
+  })
+
+  it('no muestra el aviso de reintento si el último mensaje ya tiene respuesta', () => {
+    const state = chatReducer(initialChatState, {
+      type: 'load',
+      messages: [
+        { id: 'stored-0', role: 'user', content: 'hola', streaming: false },
+        { id: 'stored-1', role: 'agent', content: '¡Hola!', streaming: false },
+      ],
+      lead: null,
+      etapa: 'NUEVO',
+      unansweredMessage: null,
+    })
+
+    expect(state.error).toBeNull()
+    expect(state.lastUserMessage).toBeNull()
+  })
 })

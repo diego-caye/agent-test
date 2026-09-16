@@ -244,6 +244,39 @@ enviar el primer mensaje → URL cambia a `/c/:id` y crea 1 sesión; recargar
 en `/c/:id` conserva la conversación; Ctrl+clic en la barra lateral abre la
 misma conversación en una pestaña nueva sin navegar la actual.
 
+### Tercera ronda · `feature/reintento-tras-recarga`
+
+Diagnóstico confirmado con datos, no solo sospecha: se inspeccionó la tabla
+`events` en Postgres para la sesión reportada como colgada y se comprobó
+que el turno de "q tal?" nunca escribió ningún evento del agente — solo el
+mensaje del usuario y, después, el evento del título en segundo plano. Se
+reprodujo la misma firma a propósito (mandar un mensaje y cortar la
+conexión del cliente a medio turno) y salió el mismo patrón exacto,
+incluido el log `Root node luis was cancelled.` de ADK. Los logs del
+incidente original ya no existían — el contenedor del backend se había
+reconstruido varias veces durante las pruebas en paralelo — así que no se
+pudo confirmar la causa puntual, pero el mecanismo general quedó probado:
+un cliente que se desconecta a medio turno hace que ADK cancele la tarea
+sin persistir nada, ni siquiera un evento de error.
+
+- [x] Al cargar una conversación cuyo último mensaje es del usuario (sin
+  respuesta después), se reconstruye la señal de reintento: mismo banner y
+  botón "Reintentar" que un fallo en vivo, con el mensaje exacto guardado.
+- [x] De paso, "Reintentar" dejó de duplicar la burbuja del mensaje del
+  usuario (ya estaba en pantalla, sea por un fallo en vivo o por el
+  historial cargado): `send()` ahora recibe `{ echo: false }` para no
+  volver a agregarla.
+- [x] 2 tests nuevos del reducer para el caso "conversación sin respuesta"
+  y el caso "ya tiene respuesta, no muestra el aviso".
+- [x] A pedido del humano, el botón "Reintentar" se movió del banner de
+  error (al pie de la pantalla, ambiguo con más de un mensaje) a un ícono
+  bajo el mensaje concreto que se reenvía — solo el último mensaje puede
+  necesitarlo. El banner se queda solo con el texto de qué pasó.
+
+Verificado en el navegador contra una sesión reproducida a propósito: el
+banner aparece al abrir `/c/:id`, "Reintentar" reenvía el mismo mensaje sin
+duplicar la burbuja y el banner desaparece al llegar la respuesta real.
+
 ## F7 · `feature/feedback-evals` · P1
 
 DoD: scores visibles en Langfuse; evalset corre.
