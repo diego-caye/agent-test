@@ -2,7 +2,18 @@ from datetime import datetime
 from uuid import UUID
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import BigInteger, Boolean, DateTime, Index, String, Text, func, text
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    DateTime,
+    Float,
+    Index,
+    Integer,
+    String,
+    Text,
+    func,
+    text,
+)
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -75,6 +86,44 @@ class SessionTitleRow(Base):
     session_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     user_id: Mapped[UUID] = mapped_column(PgUUID(as_uuid=True), index=True)
     title: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class FeedbackRow(Base):
+    """Feedback 👍/👎 del usuario sobre un turno (spec 02, spec 08 S4).
+
+    Solo se escribe, nada dentro de la app lo vuelve a leer: vive aquí para
+    tener un respaldo propio incluso sin Langfuse configurado (el score
+    `user-feedback` se manda ahí también, pero eso es best-effort).
+    """
+
+    __tablename__ = "feedback"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    session_id: Mapped[str] = mapped_column(String(64), index=True)
+    user_id: Mapped[UUID] = mapped_column(PgUUID(as_uuid=True), index=True)
+    trace_id: Mapped[str] = mapped_column(String(64))
+    score: Mapped[int] = mapped_column(Integer)
+    comment: Mapped[str | None] = mapped_column(String(500), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class EvaluationRow(Base):
+    """Un criterio evaluado de un turno (spec 08 S5), una fila por criterio.
+
+    Igual que feedback: solo se escribe desde EvaluationService, nada dentro
+    de la app la vuelve a leer. El score tambien se manda a Langfuse
+    (best-effort); esta tabla es el respaldo propio que sobrevive sin eso.
+    """
+
+    __tablename__ = "evaluations"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    session_id: Mapped[str] = mapped_column(String(64), index=True)
+    message_id: Mapped[str] = mapped_column(String(64), index=True)
+    criterio: Mapped[str] = mapped_column(String(32))
+    score: Mapped[float] = mapped_column(Float)
+    justificacion: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

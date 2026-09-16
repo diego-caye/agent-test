@@ -462,10 +462,56 @@ verde (sin cambios, usan su propio entorno de test).
 
 DoD: scores visibles en Langfuse; evalset corre.
 
-- [ ] `POST /feedback`
-- [ ] Evaluación post-ejecución en background
+- [x] `POST /feedback`
+- [x] Evaluación post-ejecución en background
 - [ ] `EventsCompactionConfig` afinado
 - [x] Evalset ADK
+
+### Langfuse real configurado y `POST /feedback` + evaluación en background
+
+El humano creó su propio proyecto de Langfuse (plan HIPAA, host distinto del
+`cloud.langfuse.com` por defecto) y pasó las keys. Quedaron solo en `.env`
+(nunca en `.env.example` ni comiteadas — verificado con `git check-ignore`).
+
+- [x] Verificado end-to-end contra el Langfuse real, no asumido: un turno de
+  verdad genera un trace consultable por la API pública de Langfuse
+  (`GET /api/public/v2/observations`) con el árbol completo de spans
+  (`chat.turn` → `invocation` → `agent_run` → `call_llm`). La API "legacy"
+  de lectura de traces (`GET /api/public/traces/{id}`) está deprecada para
+  cuentas nuevas — hay que usar la v2; documentado en el código.
+- [x] `POST /api/v1/feedback`: tabla `feedback` (migración), repositorio,
+  endpoint con el contrato exacto de spec 02, más el score `user-feedback`
+  a Langfuse (`POST /api/public/scores`, también verificado en vivo:
+  responde 200 y el score aparece consultable por `GET /api/public/v3/scores`
+  con delay de unos minutos — la API de lectura de Langfuse lo advierte
+  explícitamente).
+- [x] Evaluación post-ejecución en background (`EvaluationService`): tras
+  cada turno, si `EVAL_SAMPLE_RATE` lo elige, un juez con `EVAL_MODEL`
+  (una sola llamada, no una por criterio) evalúa tono empático, brevedad,
+  una sola pregunta y sin precios siempre, más fidelidad al RAG solo si el
+  turno usó `search_knowledge_base`. Persiste en tabla `evaluations` y manda
+  `quality.<criterio>` a Langfuse. Nunca bloquea `message.completed`: se
+  agenda como `BackgroundTasks` una vez conocido el texto final, dentro del
+  propio generador de `_stream` (no antes, a diferencia de `title_service`,
+  porque necesita el resultado del turno, no solo el mensaje de entrada).
+  Un turno reanudado por HITL (`chat/confirmations`) nunca se muestrea: no
+  hay mensaje de usuario fresco que evaluar ahí.
+- [x] Verificado en vivo contra el stack Docker + Ollama real con
+  `EVAL_SAMPLE_RATE=1.0`: un turno real generó las 4 filas en `evaluations`
+  con justificaciones coherentes del juez (`qwen3:4b-instruct`), y los
+  scores llegaron a Langfuse.
+- [x] `EVAL_SAMPLE_RATE` real de esta máquina en `1.0` para que la demo
+  muestre evaluaciones en todos los turnos; el default de `.env.example`
+  se queda en `0.0` (P1 opcional, cada turno muestreado es una llamada
+  extra al modelo).
+- [x] `tests/conftest.py`: `LANGFUSE_*` ahora se fuerzan a vacío en
+  `TEST_ENV` — sin esto, con keys reales en el `.env` del desarrollador,
+  toda la suite heredaba `telemetry_enabled=True` y command tests que
+  asumían "sin Langfuse" se rompían (o peor, habrían llamado a la API real
+  de Langfuse sin querer). Hallazgo real al configurar las keys, no
+  hipotético.
+- [x] 17 tests nuevos (feedback, telemetry/scores, evaluation_service,
+  wiring de background). Suite completa: 190 tests, mypy y ruff limpios.
 
 A pedido del humano: armar conversaciones on-topic y fuera de tema para
 verificar que el agente no se sale de su guion, y correrlas de verdad contra

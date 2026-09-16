@@ -46,6 +46,17 @@ class ChatRequest(BaseModel):
     model_id: str | None = None
 
 
+class FeedbackRequest(BaseModel):
+    session_id: str
+    trace_id: str
+    score: Literal[1, -1]
+    comment: str | None = Field(default=None, max_length=500)
+
+
+class FeedbackResponse(BaseModel):
+    ok: bool = True
+
+
 class ModelOption(BaseModel):
     id: str
     label: str

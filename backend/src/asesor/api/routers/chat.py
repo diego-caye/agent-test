@@ -1,4 +1,5 @@
 import logging
+import random
 from collections.abc import AsyncIterator
 from typing import Annotated, Any
 from uuid import UUID
@@ -29,17 +30,26 @@ async def _stream(
     session_id: str,
     user_id: UUID,
     events: AsyncIterator[Event],
+    *,
+    background: BackgroundTasks | None = None,
+    user_message: str | None = None,
 ) -> AsyncIterator[str]:
     with turn_span(
         session_id=session_id, user_id=str(user_id), settings=container.settings
     ) as turn:
         completed: dict[str, Any] = {}
         reported_error = False
+        final_text = ""
+        used_rag = False
 
         try:
             async for sse_event in translate(events, turn.trace_id):
                 if sse_event.event == "message.completed":
                     completed = dict(sse_event.data)
+                elif sse_event.event == "message.delta":
+                    final_text = str(sse_event.data.get("delta") or "")
+                elif sse_event.event == "tool.started":
+                    used_rag = used_rag or sse_event.data.get("name") == "search_knowledge_base"
                 reported_error = reported_error or sse_event.event == "error"
                 yield sse_event.encode()
         except Exception:
@@ -71,6 +81,28 @@ async def _stream(
                 **completed,
             }
         )
+
+        # Evaluación post-turno en background (spec 08 §5): solo si el turno
+        # terminó con texto de verdad (no HITL/error), hay un mensaje de
+        # usuario fresco que evaluar -- chat/confirmations no manda uno, así
+        # que un turno reanudado por HITL nunca se muestrea -- y el muestreo
+        # (EVAL_SAMPLE_RATE) lo eligió.
+        if (
+            background is not None
+            and user_message is not None
+            and completed
+            and final_text
+            and random.random() < container.settings.eval_sample_rate
+        ):
+            background.add_task(
+                container.evaluation_service.evaluate_turn,
+                session_id=session_id,
+                message_id=str(completed.get("message_id", "")),
+                trace_id=turn.trace_id,
+                user_message=user_message,
+                agent_reply=final_text,
+                used_rag=used_rag,
+            )
 
 
 async def _guarded_service(
@@ -113,7 +145,14 @@ async def chat_stream(
 
     events = service.run_turn(user_id, body.session_id, body.message, fault)
     return StreamingResponse(
-        _stream(container, body.session_id, user_id, events),
+        _stream(
+            container,
+            body.session_id,
+            user_id,
+            events,
+            background=background,
+            user_message=body.message,
+        ),
         media_type="text/event-stream",
         headers=SSE_HEADERS,
         background=background,
