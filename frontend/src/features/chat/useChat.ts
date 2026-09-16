@@ -1,10 +1,22 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 
-import { api, sendConfirmation, sendMessage } from '../../api/client'
+import { StreamIdleTimeoutError, api, sendConfirmation, sendMessage } from '../../api/client'
 import type { ModelOption, ServerEvent, SessionSummary } from '../../api/types'
 import { type Message, chatReducer, initialChatState } from './reducer'
 
 const GENERIC_ERROR = 'No pudimos conectar con el asesor. Reintenta en unos segundos.'
+const TIMEOUT_ERROR = 'El asesor tardó demasiado en responder. Reintenta en unos segundos.'
+
+// Eventos que cierran un turno de verdad. Si el stream termina sin haber
+// emitido ninguno, la conexión se cortó a medias (crash del backend, red de
+// Docker caída): no es un turno silencioso legítimo, es un fallo que hay que
+// mostrar con un reintento en vez de dejar la interfaz colgada en "escribiendo".
+const TERMINAL_EVENTS: ReadonlySet<ServerEvent['type']> = new Set([
+  'message.completed',
+  'error',
+  'hitl.confirmation_required',
+  'handoff.created',
+])
 
 const MODEL_KEY = 'asesor.model_id'
 
@@ -44,25 +56,53 @@ export function useChat() {
   const consume = useCallback(
     async (events: AsyncGenerator<ServerEvent>) => {
       dispatch({ type: 'turn-start' })
+      let sawTerminalEvent = false
       try {
         for await (const event of events) {
           dispatch({ type: 'server', event })
+          if (TERMINAL_EVENTS.has(event.type)) sawTerminalEvent = true
+        }
+        if (!sawTerminalEvent) {
+          dispatch({ type: 'turn-failed', message: GENERIC_ERROR })
         }
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') return
-        dispatch({ type: 'turn-failed', message: GENERIC_ERROR })
+        const message = error instanceof StreamIdleTimeoutError ? TIMEOUT_ERROR : GENERIC_ERROR
+        dispatch({ type: 'turn-failed', message })
       }
     },
     [dispatch],
   )
 
+  // Se guarda la promesa en curso, no solo un booleano: varios clics en
+  // "Nueva conversación" antes del primer re-render caían todos dentro de la
+  // ventana en la que un estado `creating` todavía valía false, y cada uno
+  // creaba su propia sesión. Devolver la misma promesa a todos los que llegan
+  // mientras ya hay una creación en vuelo evita la duplicación sin ignorar el
+  // clic silenciosamente.
+  const creatingSessionRef = useRef<Promise<string> | null>(null)
+  const [creatingSession, setCreatingSession] = useState(false)
+
   const createSession = useCallback(async () => {
-    abortRef.current?.abort()
-    const { session_id } = await api.createSession()
-    setSessionId(session_id)
-    dispatch({ type: 'reset' })
-    await refreshSessions()
-    return session_id
+    if (creatingSessionRef.current) return creatingSessionRef.current
+
+    const promise = (async () => {
+      setCreatingSession(true)
+      try {
+        abortRef.current?.abort()
+        const { session_id } = await api.createSession()
+        setSessionId(session_id)
+        dispatch({ type: 'reset' })
+        await refreshSessions()
+        return session_id
+      } finally {
+        creatingSessionRef.current = null
+        setCreatingSession(false)
+      }
+    })()
+
+    creatingSessionRef.current = promise
+    return promise
   }, [refreshSessions])
 
   const openSession = useCallback(async (id: string) => {
@@ -155,6 +195,7 @@ export function useChat() {
     state,
     sessions,
     sessionId,
+    creatingSession,
     models,
     modelId,
     setModelId,

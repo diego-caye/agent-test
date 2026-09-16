@@ -1,12 +1,14 @@
 # Spec de UI · Asesor automotriz
 
-Plan de diseño previo al código (F4), actualizado en F6 al adoptar shadcn/ui. El objetivo es que se lea como una herramienta de asesoría con la que un peruano conversaría con confianza, no como una demo genérica de IA.
+Plan de diseño previo al código (F4), actualizado en F6 al adoptar shadcn/ui y de nuevo al pasar de una paleta azul + ámbar a blanco y negro con modo claro/oscuro. El objetivo es que se lea como una herramienta de asesoría con la que un peruano conversaría con confianza, no como una demo genérica de IA.
 
 ## 0. Base de componentes
 
 Los componentes vienen de **shadcn/ui** (preset `radix-nova`, primitivas de Radix, iconos de Lucide), instalados en `src/components/ui/` y versionados con el repo: no es una dependencia opaca, es código propio que se puede leer y modificar. Lo que aporta y no íbamos a rehacer bien a mano es el comportamiento accesible de los overlays — el `Select` del selector de modelo y el `AlertDialog` de borrado necesitan foco atrapado, cierre con Escape, navegación con teclado y `aria-*` correctos.
 
 La paleta de la sección 2 **no** se mantiene aparte: se expresa directamente en los tokens semánticos de shadcn (`--primary`, `--muted-foreground`, `--border`…), de modo que cualquier componente que se añada después salga ya con la identidad del producto. Tener dos sistemas de color conviviendo era la forma segura de que se desincronizaran.
+
+Un componente propio, no de shadcn, controla el modo: `ThemeToggle` alterna la clase `.dark` en `<html>` y persiste la elección en `localStorage`. Un script inline en `index.html` la aplica antes del primer render para no mostrar un parpadeo del tema equivocado, y hasta que la persona no toca el botón la app sigue el tema del sistema operativo.
 
 ## 1. Principios
 
@@ -22,26 +24,26 @@ Fondo crema con acento terracota; negro con acento neón; kit de tarjetas SaaS i
 
 ## 2. Color
 
-Superficie azul noche, ligeramente desaturada hacia el azul, con un ámbar cálido como único acento. El ámbar evoca la luz de tablero de un auto y se reserva para lo accionable y para la actividad del agente, así que el ojo aprende rápido qué es interactivo.
+Blanco y negro puros, sin acento de color: el propio contraste tipográfico hace de jerarquía y nada compite por la atención con lo que dice Luis. `--primary` se invierte entre modos (negro sobre blanco en claro, blanco sobre negro en oscuro) en vez de ser un tono fijo, que es como shadcn resuelve un "botón principal" en una paleta neutra. El éxito de un handoff y los errores conservan un color discreto porque son estado, no decoración — perderlos del todo le habría costado claridad a la interfaz.
 
-| Token | Hex | Rol |
-|---|---|---|
-| `--background` | `#12161F` | Fondo de la aplicación |
-| `--card` / `--sidebar` | `#1A202C` | Sidebar, panel dev, burbuja del agente |
-| `--popover` / `--secondary` | `#222A38` | Menú del selector, tarjeta HITL |
-| `--border` / `--input` | `#2C3544` | Separadores y bordes de 1px |
-| `--foreground` | `#E7EAF0` | Texto principal |
-| `--muted-foreground` | `#94A0B4` | Metadatos, timestamps, chips |
-| `--primary` / `--ring` | `#E8A33D` | Botón primario, punto de actividad, foco |
-| `--primary-foreground` | `#1A1206` | Texto sobre ámbar |
-| `--color-accent-soft` | `#3B3020` | Fondo de chip de actividad |
-| `--color-user-bubble` | `#2A3547` | Burbuja del usuario |
-| `--color-ok` | `#4FA87B` | Handoff confirmado |
-| `--destructive` | `#D8695C` | Errores y borrado |
+| Token | Claro | Oscuro | Rol |
+|---|---|---|---|
+| `--background` | `#FFFFFF` | `#0A0A0A` | Fondo de la aplicación |
+| `--card` | `#FFFFFF` | `#171717` | Burbuja del agente, panel dev |
+| `--sidebar` | `#FAFAFA` | `#141414` | Barra lateral |
+| `--popover` / `--secondary` | `#F2F2F2` | `#262626` | Menú del selector, tarjeta HITL |
+| `--border` / `--input` | `#E2E2E2` | `#2B2B2B` | Separadores y bordes de 1px |
+| `--foreground` | `#0A0A0A` | `#F2F2F2` | Texto principal |
+| `--muted-foreground` | `#6B6B6B` | `#A3A3A3` | Metadatos, timestamps, chips |
+| `--primary` / `--ring` | `#171717` | `#F2F2F2` | Botón primario, punto de actividad, foco |
+| `--primary-foreground` | `#FAFAFA` | `#171717` | Texto sobre el botón primario |
+| `--color-accent-soft`, `--color-user-bubble` | = `--secondary` | = `--secondary` | Fondo de chip de actividad, burbuja del usuario |
+| `--color-ok` | `#1A7A42` | `#4ADE80` | Handoff confirmado |
+| `--destructive` | `#C0362C` | `#E5645A` | Errores y borrado |
 
-Los tres con prefijo `--color-` son tonos propios del chat que shadcn no nombra; el resto son sus tokens semánticos con nuestros valores. La aplicación es solo oscura, así que `:root` ya lleva los valores oscuros y `.dark` repite los mismos para los componentes que consultan la clase.
+`:root` lleva el tema claro y `.dark` el oscuro; cuál de los dos se aplica lo decide `ThemeToggle` (sección 0), no una media query — así una elección explícita no queda pisada por el sistema operativo.
 
-Contraste: `--foreground` sobre `--background` ≈ 13:1 y `--muted-foreground` sobre `--card` ≈ 5.1:1, ambos por encima de AA. El ámbar se usa como fondo con texto oscuro (`--primary-foreground`), nunca como texto claro sobre oscuro en tamaño pequeño.
+Contraste en ambos modos: `--foreground` sobre `--background` ≈ 19:1 (claro) y ≈ 17:1 (oscuro); `--muted-foreground` sobre `--card`/`--sidebar` por encima de 4.5:1. El botón primario usa `--primary-foreground` sobre `--primary`, nunca texto de un tono sobre fondo del mismo tono.
 
 ## 3. Tipografía
 
@@ -100,7 +102,7 @@ Agente a la izquierda sobre `--card`, usuario a la derecha sobre `--color-user-b
 **Indicador de escritura.** Como la burbuja del agente no existe hasta que llega la respuesta completa, entre el envío y la respuesta no habría nada en pantalla: con un modelo local en frío eso son decenas de segundos y la interfaz parece colgada. Tres puntos animados ocupan ese hueco desde el primer instante, y a los 8 segundos se añade una línea explicando que el modelo local está cargando. Respeta `prefers-reduced-motion`.
 
 ### Chip de actividad
-Línea propia, fondo `--color-accent-soft`, texto `--muted-foreground`, punto ámbar a la izquierda. Aparece al recibir `tool.started` y se resuelve al llegar `tool.finished`.
+Línea propia, fondo `--color-accent-soft`, texto `--muted-foreground`, punto en `--primary` a la izquierda. Aparece al recibir `tool.started` y se resuelve al llegar `tool.finished`.
 
 | Tool | Texto |
 |---|---|
@@ -109,7 +111,7 @@ Línea propia, fondo `--color-accent-soft`, texto `--muted-foreground`, punto á
 | `solicitar_contacto_humano` | "Preparando tu solicitud…" |
 
 ### Tarjeta HITL
-Se dispara con `hitl.confirmation_required`. Fondo elevado, borde ámbar de 1px. Muestra motivo en lenguaje natural (no el enum), el resumen del requerimiento y el canal si se conoce. Dos botones: **"Confirmar solicitud"** (ámbar, primario) y **"Ahora no"** (fantasma). Al confirmar, la tarjeta se reemplaza por una línea de éxito en `--success`: "Solicitud enviada · TICK-00042".
+Se dispara con `hitl.confirmation_required`. Fondo elevado, borde `--primary` de 1px. Muestra motivo en lenguaje natural (no el enum), el resumen del requerimiento y el canal si se conoce. Dos botones: **"Confirmar solicitud"** (primario) y **"Ahora no"** (fantasma). Al confirmar, la tarjeta se reemplaza por una línea de éxito en `--color-ok`: "Solicitud enviada · TICK-00042".
 
 Motivos en lenguaje natural: `TEST_DRIVE` → "agendar un test drive"; `COTIZACION_FORMAL` → "una cotización formal"; `COMPRA_INMEDIATA` → "avanzar con la compra"; `DISCONFORMIDAD` → "atender un reclamo"; `FUERA_DE_ALCANCE` → "hablar con un especialista".
 
@@ -120,14 +122,17 @@ En la cabecera, a la izquierda del botón del panel dev. Un `Select` que lista e
 Lo genera `GUARDRAIL_MODEL` (el modelo pequeño) a partir del primer mensaje del usuario, en segundo plano y después del turno, para no sumarle latencia a la respuesta. De tres a seis palabras, máximo 48 caracteres. Si el modelo devuelve algo inservible se usa el propio mensaje recortado: una conversación siempre tiene que poder distinguirse de las demás en la lista.
 
 ### Error
-Banda sobre el campo de entrada, borde `--destructive`. Texto que dice qué pasó y qué hacer ("No pudimos conectar con el asesor. Reintenta en unos segundos.") y un botón "Reintentar" que reenvía el último mensaje.
+Banda sobre el campo de entrada, borde `--destructive`. Texto que dice qué pasó y qué hacer y un botón "Reintentar" que reenvía el último mensaje. Se dispara en tres casos: el backend manda un evento `error`; la conexión SSE se corta sin ningún evento de cierre (crash del backend, red caída — no hay forma de distinguirlo de un turno legítimo salvo notando que nunca llegó nada definitivo); o el turno queda en silencio total más de tres minutos, que es el timeout de inactividad del lado del cliente. Los tres casos usan el mismo componente porque desde el punto de vista de quien espera una respuesta son el mismo problema: no llegó nada y hay que poder reintentar sin recargar la página.
 
 ### Panel dev
 Ficha del lead campo por campo (los vacíos en `--muted-foreground` con un guion), etapa como insignia, y del último turno: latencia en ms, tokens in/out y link a la traza si hay `LANGFUSE_PROJECT_ID`. El selector de fault injection se añade en F6, junto con la funcionalidad que lo respalda.
 
+### Botón "Nueva conversación"
+Deshabilitado mientras la creación está en vuelo, y la propia llamada devuelve la promesa ya en curso en vez de disparar una nueva: varios clics seguidos (o un doble clic accidental) antes de que vuelva la respuesta del primero creaban una conversación por clic.
+
 ## 6. Accesibilidad y calidad
 
-- Foco visible en todo elemento interactivo: anillo ámbar (`--ring`). Nunca `outline: none` sin reemplazo.
+- Foco visible en todo elemento interactivo: anillo `--ring`, que se invierte con el tema igual que el resto de la paleta. Nunca `outline: none` sin reemplazo.
 - El campo de entrada es un `textarea`: Enter envía y Shift+Enter hace salto de línea, que es lo que ya se espera de un chat.
 - La lista de mensajes es `aria-live="polite"` para que un lector de pantalla anuncie las respuestas conforme llegan.
 - Los chips de actividad y el estado de conexión se anuncian con `role="status"`.

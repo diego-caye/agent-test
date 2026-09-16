@@ -39,7 +39,11 @@ export function ModelSelect({ models, value, disabled, onChange }: Props) {
       >
         <SelectValue />
       </SelectTrigger>
-      <SelectContent>
+      {/* "item-aligned" (el valor por defecto) superpone el menú sobre el
+          disparador para alinear la opción elegida, como un <select> nativo;
+          en una cabecera angosta eso tapaba el propio selector. "popper"
+          lo abre debajo, como cualquier otro menú desplegable. */}
+      <SelectContent position="popper" align="start" sideOffset={6}>
         {models.map((model) => (
           // Las opciones sin configurar se muestran deshabilitadas en vez de
           // ocultarse: así se ve qué hay disponible y por qué no se puede usar.

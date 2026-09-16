@@ -174,6 +174,43 @@ El modelo se elige **por turno y no por sesión**: la conversación vive en
 `DatabaseSessionService`, así que cambiarlo a media charla no pierde nada. Es la
 forma más directa de enseñar el mismo caso con los tres modelos.
 
+### Ronda de corrección · `fix/ux-reintento-modo-oscuro`
+
+Bugs reales encontrados al usar la interfaz recién armada, todos con causa
+identificada antes de tocar código:
+
+- [x] **"Nueva conversación" creaba una sesión por clic.** Sin guard: cada
+  clic disparaba su propia llamada async antes de que la primera terminara.
+  Se guarda la promesa en curso y los clics mientras tanto la reciben en vez
+  de crear otra; el botón además se deshabilita. Verificado con 8 clics
+  síncronos → 1 sola sesión.
+- [x] **El `Select` de modelo se abría encima del propio selector.**
+  `position="item-aligned"` (el valor por defecto de shadcn, pensado para
+  imitar un `<select>` nativo) alinea la opción elegida con el disparador;
+  en una cabecera angosta eso lo tapaba. Cambiado a `position="popper"`.
+- [x] **Un turno sin respuesta dejaba la interfaz colgada en "escribiendo"
+  para siempre**, sin error ni forma de reintentar. Dos causas cubiertas: (a)
+  la conexión SSE se corta sin ningún evento de cierre — se detecta si el
+  stream termina sin haber visto `message.completed`/`error`/confirmación/
+  handoff; (b) el turno queda en silencio total — timeout de inactividad de
+  3 minutos en el cliente (holgado a propósito: un turno sin tools no manda
+  ni un byte hasta que L4 termina de revisar la respuesta completa, y Gemini
+  con reintentos de proveedor se ha medido en 121 s). Verificado interceptando
+  la respuesta SSE con Playwright para forzar el corte silencioso.
+- [x] **Paleta monocroma (blanco y negro) con modo claro/oscuro**, a pedido
+  del humano en vez de azul noche + ámbar. `ThemeToggle` alterna la clase
+  `.dark`, persiste en `localStorage` y sigue el tema del sistema hasta que
+  se toca el botón; un script inline evita el parpadeo del tema equivocado
+  en la primera pintura.
+- [x] Descubierto en el camino: el caché de módulos de Vite (`node_modules/.vite`)
+  había quedado con una versión de antes de adoptar shadcn/ui, así que la UI
+  que se estaba probando mezclaba componentes viejos y nuevos. `docker compose
+  restart` no lo limpia; hace falta borrar el caché a mano una vez.
+
+Verificado el 2026-09-16: 152 tests de backend y 19 de frontend en verde
+(2 nuevos para el timeout de inactividad), typecheck y build limpios, cero
+errores de consola en el navegador en ambos temas.
+
 ## F7 · `feature/feedback-evals` · P1
 
 DoD: scores visibles en Langfuse; evalset corre.
