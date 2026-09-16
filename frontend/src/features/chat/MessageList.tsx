@@ -128,7 +128,10 @@ function TypingIndicator() {
       </span>
       {slow && (
         <span className="px-1 text-xs text-muted-foreground">
-          El modelo local está cargando, suele tardar la primera vez…
+          {/* No se afirma que es "la primera vez": no hay forma de saberlo
+              desde aquí, y decirlo igual en la quinta llamada del modelo ya
+              caliente confunde más de lo que tranquiliza. */}
+          Los modelos locales a veces tardan más de lo normal…
         </span>
       )}
     </div>
@@ -138,7 +141,10 @@ function TypingIndicator() {
 function Dot({ delay }: { delay: string }) {
   return (
     <span
-      className="size-1.5 animate-bounce rounded-full bg-muted"
+      // bg-muted-foreground, no bg-muted: en modo oscuro --muted y --card
+      // son literalmente el mismo gris (#171717), así que los puntos quedaban
+      // invisibles sobre la burbuja — solo se veía el borde vacío.
+      className="size-1.5 animate-bounce rounded-full bg-muted-foreground"
       style={{ animationDelay: delay }}
       aria-hidden="true"
     />
