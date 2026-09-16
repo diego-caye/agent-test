@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
-import { RotateCcw } from 'lucide-react'
+import { type KeyboardEvent, useEffect, useRef, useState } from 'react'
+import { Pencil, RotateCcw } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
 
 import type { Activity, Message } from './reducer'
 import { TOOL_ACTIVITY } from './labels'
@@ -15,9 +16,17 @@ type Props = {
   // sea por un fallo en vivo o porque se cargó así una conversación vieja.
   retryable: boolean
   onRetry: () => void
+  onEdit: (text: string) => void
 }
 
-export function MessageList({ messages, activity, streaming, retryable, onRetry }: Props) {
+export function MessageList({
+  messages,
+  activity,
+  streaming,
+  retryable,
+  onRetry,
+  onEdit,
+}: Props) {
   const endRef = useRef<HTMLDivElement>(null)
   const lastMessage = messages.at(-1)
 
@@ -46,6 +55,7 @@ export function MessageList({ messages, activity, streaming, retryable, onRetry 
             showRetry={retryable && message.id === lastMessage?.id}
             retryDisabled={streaming}
             onRetry={onRetry}
+            onEdit={onEdit}
           />
         ))}
 
@@ -68,13 +78,72 @@ function Bubble({
   showRetry,
   retryDisabled,
   onRetry,
+  onEdit,
 }: {
   message: Message
   showRetry: boolean
   retryDisabled: boolean
   onRetry: () => void
+  onEdit: (text: string) => void
 }) {
   const isUser = message.role === 'user'
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(message.content)
+
+  function startEdit() {
+    setDraft(message.content)
+    setEditing(true)
+  }
+
+  function confirmEdit() {
+    const trimmed = draft.trim()
+    if (!trimmed) return
+    setEditing(false)
+    onEdit(trimmed)
+  }
+
+  function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault()
+      confirmEdit()
+    } else if (event.key === 'Escape') {
+      setEditing(false)
+    }
+  }
+
+  // La edición ocurre en el propio div del mensaje: la burbuja se convierte
+  // en un campo editable en su lugar, en vez de mandar el texto al cuadro
+  // principal de abajo. Al confirmar, esta misma burbuja queda con el texto
+  // corregido (reducer 'edit-last-message') — no se agrega una aparte.
+  if (editing) {
+    return (
+      <div className="flex flex-col items-end">
+        <Textarea
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={onKeyDown}
+          autoFocus
+          rows={2}
+          maxLength={2000}
+          className="max-w-[92%] resize-none text-[15px] sm:max-w-[80%]"
+        />
+        <div className="mt-1 flex gap-1">
+          <Button type="button" size="xs" onClick={confirmEdit} disabled={!draft.trim()}>
+            Guardar y enviar
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            onClick={() => setEditing(false)}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            Cancelar
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className={isUser ? 'flex flex-col items-end' : 'flex flex-col items-start'}>
@@ -90,20 +159,33 @@ function Bubble({
         {message.content}
       </p>
 
-      {/* Ícono junto al mensaje concreto que se reenvía, no un botón grande
-          y ambiguo al pie de la pantalla que no deja claro qué reintenta. */}
+      {/* Junto al mensaje concreto que se reenvía, no un botón grande y
+          ambiguo al pie de la pantalla que no deja claro qué reintenta. */}
       {showRetry && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="xs"
-          onClick={onRetry}
-          disabled={retryDisabled}
-          className="text-muted-foreground hover:text-foreground mt-1"
-        >
-          <RotateCcw aria-hidden="true" />
-          Reintentar
-        </Button>
+        <div className="mt-1 flex gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            onClick={onRetry}
+            disabled={retryDisabled}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <RotateCcw aria-hidden="true" />
+            Reintentar
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            onClick={startEdit}
+            disabled={retryDisabled}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <Pencil aria-hidden="true" />
+            Editar
+          </Button>
+        </div>
       )}
     </div>
   )

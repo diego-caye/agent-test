@@ -25,6 +25,7 @@ export default function App() {
     setModelId,
     send,
     retry,
+    editAndResend,
     startNewConversation,
     openSession,
     removeSession,
@@ -91,6 +92,7 @@ export default function App() {
           streaming={state.streaming}
           retryable={Boolean(state.error?.retryable && state.lastUserMessage)}
           onRetry={() => void retry()}
+          onEdit={(text) => void editAndResend(text)}
         />
 
         <div className="flex flex-col gap-3 border-t px-4 py-4 sm:px-8">

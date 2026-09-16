@@ -61,6 +61,10 @@ export type ChatAction =
       unansweredMessage?: string | null
     }
   | { type: 'user-sent'; content: string }
+  // Corrige el texto del último mensaje en su propio lugar (la misma
+  // burbuja), en vez de agregar uno nuevo: es lo que dispara "Editar" sobre
+  // un mensaje que se quedó sin respuesta.
+  | { type: 'edit-last-message'; content: string }
   | { type: 'turn-start' }
   | { type: 'server'; event: ServerEvent }
   | { type: 'turn-failed'; message: string }
@@ -101,6 +105,16 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
             streaming: false,
           },
         ],
+      }
+
+    case 'edit-last-message':
+      return {
+        ...state,
+        error: null,
+        lastUserMessage: action.content,
+        messages: state.messages.map((message, index) =>
+          index === state.messages.length - 1 ? { ...message, content: action.content } : message,
+        ),
       }
 
     case 'turn-start':

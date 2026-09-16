@@ -178,4 +178,31 @@ describe('chatReducer', () => {
     expect(state.error).toBeNull()
     expect(state.lastUserMessage).toBeNull()
   })
+
+  it('corrige el último mensaje en su propia burbuja al editarlo', () => {
+    const loaded = chatReducer(initialChatState, {
+      type: 'load',
+      messages: [
+        { id: 'stored-0', role: 'user', content: 'hola', streaming: false },
+        { id: 'stored-1', role: 'user', content: 'q tal?', streaming: false },
+      ],
+      lead: null,
+      etapa: 'NUEVO',
+      unansweredMessage: 'q tal?',
+    })
+
+    const state = chatReducer(loaded, {
+      type: 'edit-last-message',
+      content: 'q lindas son las camionetas no?',
+    })
+
+    // Mismo mensaje (mismo id, misma posición), no uno nuevo agregado.
+    expect(state.messages).toHaveLength(2)
+    expect(state.messages[1]).toMatchObject({
+      id: 'stored-1',
+      content: 'q lindas son las camionetas no?',
+    })
+    expect(state.lastUserMessage).toBe('q lindas son las camionetas no?')
+    expect(state.error).toBeNull()
+  })
 })
