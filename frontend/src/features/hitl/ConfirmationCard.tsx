@@ -1,3 +1,8 @@
+import { CircleCheckBig, UserRoundCheck } from 'lucide-react'
+
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+
 import { CANAL_LABEL, MOTIVO_LABEL } from '../chat/labels'
 import type { Confirmation, Handoff } from '../chat/reducer'
 
@@ -14,44 +19,48 @@ export function ConfirmationCard({ confirmation, busy, onAnswer }: Props) {
     : null
 
   return (
-    <section className="mx-auto max-w-2xl rounded-xl border border-accent/60 bg-raised p-4">
-      <h2 className="text-[15px] font-semibold">¿Te derivamos con un asesor?</h2>
-      <p className="mt-1 text-sm text-muted">
-        Luis quiere pasar tu caso a una persona para {motivo}.
-      </p>
+    <Card className="border-primary/60 bg-raised mx-auto w-full max-w-2xl gap-3 py-4">
+      <CardHeader className="gap-1">
+        <CardTitle className="flex items-center gap-2 text-[15px]">
+          <UserRoundCheck className="text-primary size-4" aria-hidden="true" />
+          ¿Te derivamos con un asesor?
+        </CardTitle>
+        <CardDescription>Luis quiere pasar tu caso a una persona para {motivo}.</CardDescription>
+      </CardHeader>
 
-      <p className="mt-3 rounded-lg bg-panel px-3 py-2 text-sm">{confirmation.resumen}</p>
+      <CardContent className="flex flex-col gap-3">
+        <p className="bg-card rounded-lg px-3 py-2 text-sm">{confirmation.resumen}</p>
 
-      {canal && <p className="mt-2 text-xs text-muted">Te contactarían por {canal}.</p>}
+        {canal && (
+          <p className="text-muted-foreground text-xs">Te contactarían por {canal}.</p>
+        )}
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => onAnswer(true)}
-          disabled={busy}
-          className="min-h-10 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-ink disabled:opacity-60"
-        >
-          Confirmar solicitud
-        </button>
-        <button
-          type="button"
-          onClick={() => onAnswer(false)}
-          disabled={busy}
-          className="min-h-10 rounded-lg border border-edge px-4 text-sm text-muted disabled:opacity-60"
-        >
-          Ahora no
-        </button>
-      </div>
-    </section>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" size="lg" onClick={() => onAnswer(true)} disabled={busy}>
+            Confirmar solicitud
+          </Button>
+          <Button
+            type="button"
+            size="lg"
+            variant="outline"
+            onClick={() => onAnswer(false)}
+            disabled={busy}
+          >
+            Ahora no
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
 export function HandoffNotice({ handoff }: { handoff: Handoff }) {
   return (
     <p
-      className="mx-auto max-w-2xl rounded-lg border border-ok/40 bg-panel px-4 py-2.5 text-sm text-ok"
+      className="border-ok/40 bg-card text-ok mx-auto flex max-w-2xl items-center gap-2 rounded-lg border px-4 py-2.5 text-sm"
       role="status"
     >
+      <CircleCheckBig className="size-4 shrink-0" aria-hidden="true" />
       {handoff.ya_existia ? 'Ya tenías una solicitud en curso' : 'Solicitud enviada'} ·{' '}
       <span className="tabular font-semibold">{handoff.ticket}</span>
     </p>

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
+import { Badge } from '@/components/ui/badge'
+
 import type { Activity, Message } from './reducer'
 import { TOOL_ACTIVITY } from './labels'
 
@@ -56,7 +58,7 @@ function Bubble({ message }: { message: Message }) {
           'max-w-[92%] px-4 py-2.5 text-[15px] leading-relaxed whitespace-pre-wrap sm:max-w-[80%]',
           isUser
             ? 'rounded-[14px] rounded-br-[4px] bg-user-bubble'
-            : 'rounded-[14px] rounded-bl-[4px] bg-panel',
+            : 'rounded-[14px] rounded-bl-[4px] bg-card border',
           message.streaming ? 'caret' : '',
         ].join(' ')}
       >
@@ -78,13 +80,13 @@ function TypingIndicator() {
 
   return (
     <div className="flex flex-col items-start gap-1.5" role="status" aria-label="Luis está escribiendo">
-      <span className="inline-flex items-center gap-1.5 rounded-[14px] rounded-bl-[4px] bg-panel px-4 py-3">
+      <span className="inline-flex items-center gap-1.5 rounded-[14px] rounded-bl-[4px] bg-card border px-4 py-3">
         <Dot delay="0ms" />
         <Dot delay="160ms" />
         <Dot delay="320ms" />
       </span>
       {slow && (
-        <span className="px-1 text-xs text-muted">
+        <span className="px-1 text-xs text-muted-foreground">
           El modelo local está cargando, suele tardar la primera vez…
         </span>
       )}
@@ -105,10 +107,10 @@ function Dot({ delay }: { delay: string }) {
 function ActivityChip({ name }: { name: string }) {
   return (
     <div className="flex justify-start" role="status">
-      <span className="inline-flex items-center gap-2 rounded-full bg-accent-soft px-3 py-1.5 text-xs font-medium text-muted">
-        <span className="size-1.5 rounded-full bg-accent" aria-hidden="true" />
+      <Badge variant="secondary" className="bg-accent-soft text-muted-foreground h-auto py-1.5">
+        <span className="bg-primary size-1.5 animate-pulse rounded-full" aria-hidden="true" />
         {TOOL_ACTIVITY[name] ?? 'Trabajando…'}
-      </span>
+      </Badge>
     </div>
   )
 }
