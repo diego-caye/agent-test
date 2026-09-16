@@ -111,7 +111,7 @@ export function Sidebar({ sessions, activeId, onSelect, onCreate, onDelete }: Pr
                           showOnHover
                           aria-label="Eliminar conversación"
                           title="Eliminar conversación"
-                          className="text-muted-foreground hover:text-destructive top-2.5"
+                          className="text-muted-foreground hover:text-destructive !top-1/2 !-translate-y-1/2"
                         >
                           <Trash2 aria-hidden="true" />
                         </SidebarMenuAction>
