@@ -137,7 +137,7 @@ Adelantada a pedido del humano: sin `GOOGLE_API_KEY`, era lo que desbloqueaba ve
 - [x] `ADR-003-modelos-locales.md` con los hallazgos de integración
 - [x] Adaptadores: `LiteLlm` con `ollama_chat/` para el agente, `OllamaEmbeddings` para la KB
 - [x] `google-adk[extensions]` (LiteLLM no viene en la instalación base)
-- [x] `docker-compose.local-llm.yml` + `docker-compose.gpu.yml`
+- [x] Ollama en el `docker-compose.yml` bajo el perfil `local-llm` (antes dos archivos de override)
 - [x] `.env.example` con los dos perfiles intercambiables
 - [x] Validación del prefijo `ollama_chat/` y de `num_ctx` explícito en `Settings`
 - [x] KB re-ingerida con `embeddinggemma` y `RAG_MIN_SCORE` calibrado a 0.42
@@ -168,7 +168,7 @@ DoD: scores visibles en Langfuse; evalset corre.
 DoD: AT principales con Gemma 4.
 
 - [ ] `ADR-003-local-llm.md`
-- [ ] `docker-compose.local-llm.yml`
+- [ ] Ollama en Docker (perfil `local-llm`)
 - [ ] `EMBEDDINGS_PROVIDER=ollama` + re-ingesta
 
 ## F9 · `docs/release` · P0

@@ -170,6 +170,6 @@ L4 ahora detecta y elimina esas pseudo-llamadas (`strip_pseudo_tool_calls`). No 
 ## Consecuencias
 
 - El repo arranca sin ninguna API key: `docker compose up` más los dos `ollama pull` y el proyecto funciona completo.
-- `docker-compose.local-llm.yml` levanta su propio Ollama con volumen y job de descarga; `docker-compose.gpu.yml` añade la GPU aparte, para no romper el arranque en equipos sin NVIDIA. Quien ya tenga Ollama corriendo puede apuntar `OLLAMA_API_BASE` al suyo y omitir ambos.
+- El perfil `local-llm` del `docker-compose.yml` levanta su propio Ollama con volumen y job de descarga. Empezó siendo dos archivos de override (`local-llm` + `gpu`) para no romper el arranque en equipos sin NVIDIA; se unificaron en perfiles porque el perfil ya cumple esa función: `docker compose up -d` a secas nunca toca la GPU. El coste es que el perfil asume GPU; quien no la tenga apunta `OLLAMA_API_BASE` a un Ollama del host y omite el perfil, que es además lo habitual en Windows.
 - `RAG_MIN_SCORE` quedó calibrado para `embeddinggemma` (0.42). Cambiar de modelo de embeddings obliga a re-ingerir **y** a re-calibrar; el chequeo de arranque detecta lo primero, lo segundo es manual.
 - Volver a Gemini es cambiar seis variables de entorno y re-ingerir la KB. No hay código condicionado al proveedor fuera de `container.py` y `config.py`.
