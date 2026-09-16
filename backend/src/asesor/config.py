@@ -44,10 +44,13 @@ class Settings(BaseSettings):
     # Ollama recorta el contexto en silencio si no se le dice cuánto usar. Con
     # 16 GB de VRAM, 16384 es holgado para un modelo de ~10 GB.
     ollama_context_length: int = Field(default=16384, gt=0)
-    # Los modelos con capacidad de "thinking" emiten su razonamiento como texto
-    # visible si no se desactiva. Para un chat conversacional estorba y agrega
-    # latencia (spec 05 §3: nivel de thinking bajo).
-    ollama_think: bool = False
+    # Acepta un nivel ("low", "medium", "high") o un booleano. Sin valor no se
+    # manda el parámetro: Ollama responde 400 "does not support thinking" si se
+    # le envía a un modelo que no lo tiene.
+    # Los modelos pequeños con esta capacidad SOLO llaman tools con el thinking
+    # activo, así que no es opcional con ellos; "low" da el mismo tool-calling
+    # que true a menos de la mitad de latencia (spec 05 §3, ADR-003).
+    ollama_think: bool | str | None = None
 
     agent_model: str
     guardrail_model: str
