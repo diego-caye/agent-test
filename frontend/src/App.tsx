@@ -89,6 +89,8 @@ export default function App() {
           messages={state.messages}
           activity={state.activity}
           streaming={state.streaming}
+          retryable={Boolean(state.error?.retryable && state.lastUserMessage)}
+          onRetry={() => void retry()}
         />
 
         <div className="flex flex-col gap-3 border-t px-4 py-4 sm:px-8">
@@ -102,24 +104,17 @@ export default function App() {
 
           {state.handoff && <HandoffNotice handoff={state.handoff} />}
 
+          {/* El botón de reintentar vive junto al mensaje que se reenvía
+              (MessageList), no aquí: uno solo al pie de la pantalla no
+              dejaba claro qué se iba a reintentar. Esta banda solo explica
+              qué pasó. */}
           {state.error && (
             <Alert
               variant="destructive"
-              className="mx-auto flex w-full max-w-2xl items-center justify-between gap-3"
+              className="mx-auto flex w-full max-w-2xl items-center gap-3"
             >
               <TriangleAlert aria-hidden="true" />
               <AlertDescription>{state.error.message}</AlertDescription>
-              {state.error.retryable && state.lastUserMessage && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => void retry()}
-                  className="shrink-0"
-                >
-                  Reintentar
-                </Button>
-              )}
             </Alert>
           )}
 
