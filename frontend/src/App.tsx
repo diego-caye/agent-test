@@ -93,6 +93,7 @@ export default function App() {
           retryable={Boolean(state.error?.retryable && state.lastUserMessage)}
           onRetry={() => void retry()}
           onEdit={(text) => void editAndResend(text)}
+          isLocalModel={models.find((model) => model.id === modelId)?.provider === 'ollama'}
         />
 
         <div className="flex flex-col gap-3 border-t px-4 py-4 sm:px-8">

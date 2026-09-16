@@ -17,6 +17,9 @@ type Props = {
   retryable: boolean
   onRetry: () => void
   onEdit: (text: string) => void
+  // El aviso de "el modelo local tarda" no tiene sentido con Gemini: ahí la
+  // demora es de la API, no de cargar un modelo en la GPU de esta máquina.
+  isLocalModel: boolean
 }
 
 export function MessageList({
@@ -26,6 +29,7 @@ export function MessageList({
   retryable,
   onRetry,
   onEdit,
+  isLocalModel,
 }: Props) {
   const endRef = useRef<HTMLDivElement>(null)
   const lastMessage = messages.at(-1)
@@ -65,7 +69,7 @@ export function MessageList({
             <ActivityChip key={item.name} name={item.name} />
           ))}
 
-        {pendingReply && <TypingIndicator />}
+        {pendingReply && <TypingIndicator isLocalModel={isLocalModel} />}
 
         <div ref={endRef} />
       </div>
@@ -193,7 +197,7 @@ function Bubble({
 
 const SLOW_REPLY_MS = 8000
 
-function TypingIndicator() {
+function TypingIndicator({ isLocalModel }: { isLocalModel: boolean }) {
   const [slow, setSlow] = useState(false)
 
   useEffect(() => {
@@ -210,10 +214,15 @@ function TypingIndicator() {
       </span>
       {slow && (
         <span className="px-1 text-xs text-muted-foreground">
-          {/* No se afirma que es "la primera vez": no hay forma de saberlo
-              desde aquí, y decirlo igual en la quinta llamada del modelo ya
+          {/* "el modelo local tarda" no tiene sentido con Gemini: ahí la
+              demora es de la API (o de un reintento por 429), no de cargar
+              un modelo en la GPU de esta máquina. Tampoco se afirma que es
+              "la primera vez" para el caso local: no hay forma de saberlo
+              desde aquí, y decirlo en la quinta llamada del modelo ya
               caliente confunde más de lo que tranquiliza. */}
-          Los modelos locales a veces tardan más de lo normal…
+          {isLocalModel
+            ? 'Los modelos locales a veces tardan más de lo normal…'
+            : 'Esto puede tardar unos segundos…'}
         </span>
       )}
     </div>
