@@ -14,6 +14,12 @@ Crea una sesión ADK para el `user_id` del header.
 Lista sesiones del usuario del header, más recientes primero.
 - 200: `[{"session_id", "created_at", "last_message_at", "etapa"}]`
 
+### `DELETE /api/v1/sessions/{id}`
+Borra una conversación del usuario del header, con sus eventos.
+- 204 sin cuerpo
+- 404 si la sesión no existe o no pertenece al `user_id` (se comprueba la propiedad antes de borrar, para no revelar la existencia de sesiones ajenas)
+- El lead **no** se borra: vive a nivel usuario, no de sesión (spec 06 §1)
+
 ### `GET /api/v1/sessions/{id}/messages`
 Historial de una sesión.
 - 200: `[{"role": "user"|"agent", "content", "created_at"}]`

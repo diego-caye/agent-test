@@ -44,6 +44,14 @@ class ChatService:
             raise SessionNotFoundError(session_id)
         return session
 
+    async def delete_session(self, user_id: UUID, session_id: str) -> None:
+        # get_session primero para no revelar la existencia de sesiones ajenas:
+        # si no es del usuario, sale 404 igual que si no existiera.
+        await self.get_session(user_id, session_id)
+        await self._session_service.delete_session(
+            app_name=APP_NAME, user_id=str(user_id), session_id=session_id
+        )
+
     async def run_turn(
         self, user_id: UUID, session_id: str, message: str, fault: Fault | None = None
     ) -> AsyncIterator[Event]:

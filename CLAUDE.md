@@ -22,7 +22,15 @@ Python 3.12 + uv + FastAPI + Pydantic v2 + SQLAlchemy 2 async + Alembic + `googl
 
 ## Estado actual
 
-F0 (specs) y F1 (scaffold) completas y mergeadas a `develop`. **Falta remoto en GitHub y `gh auth login`**, así que los merges de fase se hacen localmente con `git merge --no-ff` y el cuerpo del merge commit hace de descripción de PR — ver `specs/open-questions.md`.
+**F0–F6 completas y mergeadas a `develop`** (F8, modelos locales, se adelantó dentro de F6). Quedan **F7** (feedback y evaluaciones, P1) y **F9** (README, diagramas, guion de demo, tag `v1.0.0`, P0).
+
+**Falta remoto en GitHub y `gh auth login`**, así que los merges de fase se hacen localmente con `git merge --no-ff` y el cuerpo del merge commit hace de descripción de PR — ver `specs/open-questions.md`.
+
+## Modelos locales
+
+El proyecto corre **sin ninguna API key**: agente `ollama_chat/gemma4:latest` con `OLLAMA_THINK=low` y contexto 32768, embeddings `embeddinggemma`. Gemini sigue disponible cambiando variables de entorno; los dos perfiles están en `.env.example`.
+
+Antes de cambiar de modelo, leer `specs/decisions/ADR-003-modelos-locales.md`. Lo esencial: si `docker exec <ollama> ollama ps` no dice `100% GPU`, el modelo no entra y la latencia se multiplica — revisar VRAM libre **y** la RAM de la VM de WSL (`%USERPROFILE%\.wslconfig`).
 
 ## Comandos
 
@@ -33,10 +41,11 @@ cd backend && uv run ruff check . && uv run ruff format --check .   # lint
 cd backend && uv run mypy                                          # typecheck
 cd backend && uv run pytest                                        # tests
 cd frontend && npm run typecheck && npm run build                  # frontend
+cd backend && uv run python scripts/ingest_kb.py                   # ingesta de la KB
 docker compose up -d --build                                       # make up
 ```
 
-En esta máquina los puertos del host están desplazados por el `.env` local (backend 8008, frontend 5174) porque 8000 y 5173 ya están ocupados por otros contenedores.
+Puertos por defecto **8090** (backend), **5190** (frontend) y **5490** (Postgres), fuera de los habituales a propósito: es normal tener otros proyectos ocupando 8000, 5173 y 5432. Se cambian con `BACKEND_PORT`, `FRONTEND_PORT` y `POSTGRES_PORT`.
 
 ## Dónde mirar cada cosa
 

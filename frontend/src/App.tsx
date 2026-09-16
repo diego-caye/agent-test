@@ -10,8 +10,17 @@ import { Sidebar } from './features/sessions/Sidebar'
 const DEV_PANEL_KEY = 'asesor.devpanel'
 
 export default function App() {
-  const { state, sessions, sessionId, send, retry, createSession, openSession, answerConfirmation } =
-    useChat()
+  const {
+    state,
+    sessions,
+    sessionId,
+    send,
+    retry,
+    createSession,
+    openSession,
+    removeSession,
+    answerConfirmation,
+  } = useChat()
   const [showDevPanel, setShowDevPanel] = useState(readDevPanelPreference)
 
   function toggleDevPanel(next: boolean) {
@@ -30,6 +39,7 @@ export default function App() {
         activeId={sessionId}
         onSelect={(id) => void openSession(id)}
         onCreate={() => void createSession()}
+        onDelete={(id) => void removeSession(id)}
       />
 
       <main className="flex min-w-0 flex-1 flex-col">
@@ -55,7 +65,11 @@ export default function App() {
           </p>
         )}
 
-        <MessageList messages={state.messages} activity={state.activity} />
+        <MessageList
+          messages={state.messages}
+          activity={state.activity}
+          streaming={state.streaming}
+        />
 
         <div className="flex flex-col gap-3 border-t border-edge px-4 py-4 sm:px-8">
           {state.pendingConfirmation && (
