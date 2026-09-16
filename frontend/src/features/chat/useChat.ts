@@ -86,6 +86,14 @@ export function useChat() {
   const createSession = useCallback(async () => {
     if (creatingSessionRef.current) return creatingSessionRef.current
 
+    // Ya se está en una conversación vacía: crear otra sería indistinguible
+    // para quien usa la app y solo deja "Conversación nueva" repetidas en la
+    // barra lateral. Esto es lo que de verdad pedía el reporte: el guard de
+    // arriba solo evita los clics simultáneos, pero varios clics normales
+    // (cada uno completo antes del siguiente) seguían abriendo una sesión
+    // por clic mientras la actual siguiera sin usarse.
+    if (sessionId && state.messages.length === 0) return sessionId
+
     const promise = (async () => {
       setCreatingSession(true)
       try {
@@ -103,7 +111,7 @@ export function useChat() {
 
     creatingSessionRef.current = promise
     return promise
-  }, [refreshSessions])
+  }, [refreshSessions, sessionId, state.messages.length])
 
   const openSession = useCallback(async (id: string) => {
     abortRef.current?.abort()
