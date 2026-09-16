@@ -101,7 +101,12 @@ Agente a la izquierda sobre `--card`, usuario a la derecha sobre `--color-user-b
 
 **Indicador de escritura.** Como la burbuja del agente no existe hasta que llega la respuesta completa, entre el envío y la respuesta no habría nada en pantalla: con un modelo local en frío eso son decenas de segundos y la interfaz parece colgada. Tres puntos animados ocupan ese hueco desde el primer instante, y a los 8 segundos se añade una línea explicando que el modelo local está cargando. Respeta `prefers-reduced-motion`.
 
-**Reintentar (bajo el mensaje, no al pie de la pantalla).** Cuando el último mensaje se quedó sin respuesta, el mensaje del usuario que corresponde muestra un botón de texto pequeño "↻ Reintentar" justo debajo — nunca en medio de la conversación, solo en el último, porque es el único que puede necesitarlo. Reenvía ese mismo texto sin duplicar la burbuja. Antes vivía como un botón grande al pie de la pantalla junto al banner de error; con más de un mensaje en la conversación no quedaba claro qué iba a reintentar, así que se movió a pegado al mensaje concreto.
+**Reintentar y editar (bajo el mensaje, no al pie de la pantalla).** Cuando el último mensaje se quedó sin respuesta, el mensaje del usuario que corresponde muestra dos botones de texto pequeños justo debajo — nunca en medio de la conversación, solo en el último, porque es el único que puede necesitarlo:
+
+- **"↻ Reintentar"** reenvía ese mismo texto sin duplicar la burbuja.
+- **"✎ Editar"** convierte esa misma burbuja en un campo editable, con foco puesto ahí — no manda el texto al campo de entrada principal de abajo. Al confirmar ("Guardar y enviar"), la burbuja queda con el texto corregido y se reenvía; no se agrega un mensaje aparte. "Cancelar" o Escape descartan el cambio sin tocar nada.
+
+Antes vivía como un botón grande al pie de la pantalla junto al banner de error; con más de un mensaje en la conversación no quedaba claro qué iba a reintentar, así que se movió a pegado al mensaje concreto.
 
 ### Chip de actividad
 Línea propia, fondo `--color-accent-soft`, texto `--muted-foreground`, punto en `--primary` a la izquierda. Aparece al recibir `tool.started` y se resuelve al llegar `tool.finished`.

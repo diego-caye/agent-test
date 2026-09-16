@@ -277,6 +277,31 @@ Verificado en el navegador contra una sesión reproducida a propósito: el
 banner aparece al abrir `/c/:id`, "Reintentar" reenvía el mismo mensaje sin
 duplicar la burbuja y el banner desaparece al llegar la respuesta real.
 
+### Cuarta ronda · `fix/indicador-escritura` y edición del último mensaje
+
+- [x] Los puntos del indicador de escritura eran invisibles en modo oscuro:
+  `bg-muted` y `bg-card` son el mismo gris (`#171717`). Cambiado a
+  `bg-muted-foreground`, verificado con el color real calculado por el
+  navegador en los dos temas.
+- [x] El aviso a los 8s afirmaba "suele tardar la primera vez" sin poder
+  saberlo — Ollama descarga el modelo de la VRAM tras un rato sin uso, así
+  que un turno "no-primero" puede recargar igual. Texto reescrito para no
+  depender de esa afirmación.
+- [x] A pedido del humano, botón "Editar" junto a "Reintentar": la propia
+  burbuja del mensaje se vuelve editable en su lugar (no se manda el texto
+  al campo de entrada principal de abajo). Al confirmar, esa misma burbuja
+  queda con el texto corregido y se reenvía — no se agrega una aparte.
+  Nueva acción de reducer, `edit-last-message`, que reemplaza el contenido
+  del último mensaje en vez de añadir uno; `send()` pasa a aceptar un modo
+  (`'append' | 'silent' | 'replace-last'`) en vez del booleano `echo`
+  anterior, para cubrir los tres casos: mensaje nuevo, reintento tal cual,
+  reintento editado.
+
+Verificado en el navegador: clic en "Editar" convierte la burbuja de
+"q tal?" en un campo editable con foco; al corregirlo y confirmar, esa
+misma burbuja pasa a mostrar el texto nuevo y recibe su respuesta — la
+conversación sigue teniendo 2 mensajes, no 3.
+
 ## F7 · `feature/feedback-evals` · P1
 
 DoD: scores visibles en Langfuse; evalset corre.
