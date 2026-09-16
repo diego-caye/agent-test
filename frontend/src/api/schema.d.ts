@@ -39,6 +39,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Session */
+        delete: operations["delete_session_api_v1_sessions__session_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sessions/{session_id}/messages": {
         parameters: {
             query?: never;
@@ -380,6 +397,37 @@ export interface operations {
             };
         };
     };
+    delete_session_api_v1_sessions__session_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-user-id"?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_messages_api_v1_sessions__session_id__messages_get: {
         parameters: {
             query?: never;
@@ -450,6 +498,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
+                "x-debug-fault"?: string | null;
                 "x-user-id"?: string | null;
             };
             path?: never;

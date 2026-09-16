@@ -144,3 +144,38 @@ async def test_at19_una_sesion_ajena_no_es_accesible(client: AsyncClient) -> Non
 
     assert response.status_code == 404
     assert response.json()["code"] == "NOT_FOUND"
+
+
+async def test_borrar_una_conversacion(
+    client: AsyncClient, fake_llm: FakeAdkLlm, user_id: UUID
+) -> None:
+    fake_llm.rules = {"hola": [FakeTurn(text="¡Hola!")]}
+    session_id = await new_session(client, user_id)
+    await send_message(client, user_id, session_id, "hola")
+
+    headers = {"X-User-Id": str(user_id)}
+    assert (
+        await client.delete(f"/api/v1/sessions/{session_id}", headers=headers)
+    ).status_code == 204
+
+    listed = await client.get("/api/v1/sessions", headers=headers)
+    assert [s["session_id"] for s in listed.json()] == []
+
+    gone = await client.get(f"/api/v1/sessions/{session_id}/messages", headers=headers)
+    assert gone.status_code == 404
+
+
+async def test_no_se_puede_borrar_una_conversacion_ajena(client: AsyncClient) -> None:
+    owner, intruder = uuid4(), uuid4()
+    session_id = await new_session(client, owner)
+
+    response = await client.delete(
+        f"/api/v1/sessions/{session_id}", headers={"X-User-Id": str(intruder)}
+    )
+
+    assert response.status_code == 404
+    # Sigue existiendo para su dueño.
+    still = await client.get(
+        f"/api/v1/sessions/{session_id}/messages", headers={"X-User-Id": str(owner)}
+    )
+    assert still.status_code == 200

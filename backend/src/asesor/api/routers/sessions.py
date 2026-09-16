@@ -49,6 +49,14 @@ async def list_sessions(request: Request, user_id: UserId) -> list[SessionSummar
     return sorted(summaries, key=lambda s: s.last_update_time, reverse=True)
 
 
+@router.delete("/{session_id}", status_code=204)
+async def delete_session(request: Request, user_id: UserId, session_id: str) -> None:
+    try:
+        await _chat_service(request).delete_session(user_id, session_id)
+    except SessionNotFoundError as exc:
+        raise NotFoundError("Session not found") from exc
+
+
 @router.get("/{session_id}/messages", response_model=list[MessageDto])
 async def list_messages(request: Request, user_id: UserId, session_id: str) -> list[MessageDto]:
     try:
