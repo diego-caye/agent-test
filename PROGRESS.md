@@ -211,6 +211,39 @@ Verificado el 2026-09-16: 152 tests de backend y 19 de frontend en verde
 (2 nuevos para el timeout de inactividad), typecheck y build limpios, cero
 errores de consola en el navegador en ambos temas.
 
+### Segunda ronda · `fix/nueva-conversacion-vacia` y `feature/rutas-por-chat`
+
+El reporte de "sigue abriendo varios" persistía tras la ronda anterior porque
+esa corrección solo cubría clics simultáneos; clics normales (cada uno
+completo antes del siguiente) seguían creando una sesión vacía por clic. La
+causa de fondo era otra: el botón creaba la sesión en el backend de
+inmediato, así que cualquier repetición —incluida recargar la página con el
+borrador sin usar, ya que `sessionId` no sobrevivía a un refresh— dejaba una
+fila vacía nueva.
+
+- [x] Primer parche: si ya se está en una conversación vacía, pedir otra
+  devuelve la misma en vez de crear una (cubre el caso de clic repetido).
+- [x] Arreglo de fondo: cada conversación pasa a tener su propia URL,
+  `/c/:id`, navegable de verdad (recarga, pestaña nueva con Ctrl/Cmd+clic,
+  atrás/adelante del navegador). `/` es el borrador. "Nueva conversación" ya
+  no llama a la API en absoluto: solo vuelve al borrador. La sesión se crea
+  recién cuando se envía el primer mensaje real.
+- [x] Router propio, sin librería: solo dos formas de URL, así que una
+  librería completa de rutas sería más código que resolver, no menos
+  (`frontend/src/lib/route.ts`).
+- [x] Entrar directo a `/c/:id` con un `id` inexistente o de otro usuario cae
+  al borrador en vez de dejar la pantalla colgada.
+- [x] Descartada una regresión del banner de reintento: la misma conversación
+  del reporte ("holaaa" → "q tal?") se repitió contra el backend real y
+  respondió bien las dos veces. La causa más probable del cuelgue reportado
+  fueron los reinicios del contenedor del frontend durante las pruebas en
+  paralelo, no un bug del cliente.
+
+Verificado en el navegador: 3 clics en el borrador → 0 sesiones creadas;
+enviar el primer mensaje → URL cambia a `/c/:id` y crea 1 sesión; recargar
+en `/c/:id` conserva la conversación; Ctrl+clic en la barra lateral abre la
+misma conversación en una pestaña nueva sin navegar la actual.
+
 ## F7 · `feature/feedback-evals` · P1
 
 DoD: scores visibles en Langfuse; evalset corre.
