@@ -1,18 +1,15 @@
 import logging
 import re
+from uuid import UUID
 
-from google.adk.events import Event
-from google.adk.events.event_actions import EventActions
 from google.adk.models.base_llm import BaseLlm
 from google.adk.models.llm_request import LlmRequest
-from google.adk.sessions import BaseSessionService, Session
 from google.genai import types
 
-from asesor.agent.factory import APP_NAME
+from asesor.infrastructure.db.session_title_repository import SqlSessionTitleRepository
 
 logger = logging.getLogger(__name__)
 
-TITLE_STATE_KEY = "titulo"
 MAX_TITLE_CHARS = 48
 
 _PROMPT = (
@@ -46,35 +43,25 @@ class TitleService:
 
     Corre en segundo plano y con el modelo ligero: nunca debe sumar latencia al
     turno ni romperlo si falla, porque es un adorno de la barra lateral.
+
+    El título vive en su propia tabla (session_title_repository), no en el
+    estado de la sesión de ADK: guardarlo ahí competía por el mismo lock
+    optimista que el turno de chat, y un turno siguiente que llegara mientras
+    el título se escribía salía rechazado con StaleSessionError — un adorno
+    tumbando la respuesta real (visto en producción, no en teoría).
     """
 
-    def __init__(self, model: BaseLlm, session_service: BaseSessionService) -> None:
+    def __init__(self, model: BaseLlm, titles: SqlSessionTitleRepository) -> None:
         self._model = model
-        self._session_service = session_service
+        self._titles = titles
 
-    async def ensure_title(self, user_id: str, session_id: str, first_message: str) -> str | None:
-        """La sesión se recarga aquí, no se recibe ya cargada.
-
-        Esto corre después del turno, así que una copia tomada antes estaría
-        obsoleta y ADK rechazaría el append con StaleSessionError.
-        """
-        session = await self._load(user_id, session_id)
-        if session is None or session.state.get(TITLE_STATE_KEY):
+    async def ensure_title(self, user_id: UUID, session_id: str, first_message: str) -> str | None:
+        if await self._titles.get(session_id) is not None:
             return None
 
         title = await self._generate(first_message) or fallback_title(first_message)
-
-        fresh = await self._load(user_id, session_id)
-        if fresh is None:
-            return None
-
-        await self._store(fresh, title)
+        await self._titles.upsert(session_id, user_id, title)
         return title
-
-    async def _load(self, user_id: str, session_id: str) -> Session | None:
-        return await self._session_service.get_session(
-            app_name=APP_NAME, user_id=user_id, session_id=session_id
-        )
 
     async def _generate(self, message: str) -> str:
         request = LlmRequest(
@@ -99,15 +86,3 @@ class TitleService:
         except Exception:
             logger.warning("no se pudo generar el título de la conversación", exc_info=True)
             return ""
-
-    async def _store(self, session: Session, title: str) -> None:
-        # El estado de sesión solo se puede cambiar añadiendo un evento con su
-        # state_delta; no hay una API para escribirlo directamente.
-        await self._session_service.append_event(
-            session,
-            Event(
-                author="system",
-                invocation_id="",
-                actions=EventActions(state_delta={TITLE_STATE_KEY: title}),
-            ),
-        )

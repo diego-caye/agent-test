@@ -27,6 +27,7 @@ from asesor.infrastructure.db.engine import create_engine, create_session_factor
 from asesor.infrastructure.db.handoff_repository import SqlHandoffRepository
 from asesor.infrastructure.db.kb_repository import PgVectorRetriever
 from asesor.infrastructure.db.lead_repository import SqlLeadRepository
+from asesor.infrastructure.db.session_title_repository import SqlSessionTitleRepository
 from asesor.infrastructure.embeddings.gemini import GeminiEmbeddings
 from asesor.infrastructure.embeddings.ollama import OllamaEmbeddings
 from asesor.infrastructure.llm.ollama_discovery import OllamaModelInfo, discover_ollama_models
@@ -43,6 +44,7 @@ class Container:
     handoff_service: HandoffService
     knowledge_service: KnowledgeService
     title_service: TitleService
+    session_titles: SqlSessionTitleRepository
     session_service: BaseSessionService
     runners: "RunnerRegistry"
 
@@ -254,7 +256,8 @@ async def build_container(
     )
 
     sessions = session_service or DatabaseSessionService(db_url=settings.database_url)
-    title_service = TitleService(build_title_model(settings, title_model), sessions)
+    session_titles = SqlSessionTitleRepository(session_factory)
+    title_service = TitleService(build_title_model(settings, title_model), session_titles)
 
     # Async y solo si hay OLLAMA_API_BASE: en los tests no se configura (usan
     # Gemini + un BaseLlm falso), así que esto no les pega a la red. Si Ollama
@@ -282,6 +285,7 @@ async def build_container(
         handoff_service=handoff_service,
         knowledge_service=knowledge_service,
         title_service=title_service,
+        session_titles=session_titles,
         session_service=sessions,
         runners=RunnerRegistry(build_runner, settings, catalog),
     )
