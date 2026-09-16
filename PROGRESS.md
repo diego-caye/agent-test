@@ -351,6 +351,49 @@ por variante confirmadas.
 
 Contenedores `ollama`/`ollama-pull` parados tras la verificación (no borrados: el volumen conserva los modelos, así que `docker compose --profile local-llm up -d` los trae de vuelta sin volver a descargar nada). Sigue pendiente, y sí hace falta si se usa este perfil para la demo: correr `ollama ps` y repetir el ajuste de VRAM/contexto de ADR-003, que está medido contra la instalación nativa, no contra esta.
 
+- [x] `OLLAMA_EXTRA_MODELS` (`.env`, lista separada por espacio): suma modelos al job `ollama-pull` sin editar `docker-compose.yml`. Corrige una confusión real: sumar un modelo al Ollama nativo (`ollama pull` + reiniciar backend) y sumarlo al perfil dockerizado para quien clona el repo son dos caminos distintos — antes el segundo exigía editar el compose a mano. Verificado con la variable vacía (0 pulls de más, `exit 0`) y con un nombre inválido (`pull model manifest: file does not exist`, `exit 1`).
+
+### Sexta ronda · `StaleSessionError` — el título tumbaba turnos reales
+
+Bug encontrado en uso real (no en pruebas sintéticas): un mensaje enviado poco después del primero, o "Reintentar", a veces fallaba con "No pudimos conectar con el asesor" sin relación aparente con Ollama ni Docker. El log real:
+
+```
+google.adk.errors._stale_session_error.StaleSessionError: The session has
+been modified in storage since it was loaded. Please reload the session
+before appending more events.
+```
+
+Causa: `TitleService` guardaba el título con `append_event` + `state_delta`
+sobre la sesión de ADK — el mismo mecanismo de bloqueo optimista que usa
+cualquier turno de chat para escribir su propia respuesta. Si la generación
+del título (que corre en segundo plano tras el primer mensaje, spec 08)
+terminaba de escribir *mientras* un turno siguiente en la misma sesión
+seguía en vuelo, el `append_event` de ese turno salía rechazado como
+obsoleto — un adorno de la barra lateral tumbando una respuesta real.
+Reproducido a propósito: primer mensaje, 0.3s de espera, segundo mensaje →
+antes fallaba, con el fix no.
+
+- [x] Nueva tabla `session_titles` (migración `37a9f8f5a59d`), completamente
+  aparte de la sesión de ADK: no comparte ningún candado con el turno de
+  chat. `SqlSessionTitleRepository` (get/get_many/upsert/delete).
+- [x] `TitleService` simplificado: ya no carga ni recarga la sesión de ADK
+  en ningún punto, solo llama al repositorio. Menos código y sin la
+  condición de carrera.
+- [x] `GET /api/v1/sessions` lee los títulos en un solo round-trip
+  (`get_many`), no uno por fila.
+- [x] `DELETE /api/v1/sessions/{id}` limpia también la fila de
+  `session_titles` — antes de esto no habría quedado huérfana en ADK
+  (vivía en el propio estado de la sesión, que se borra con ella), así
+  que hacía falta el borrado explícito para no dejar filas sueltas.
+  Verificado.
+- [x] 10 tests nuevos (`test_session_title_repository.py`,
+  `test_title_service.py` con `ensure_title`).
+
+Verificado en vivo contra el backend real: el escenario exacto que
+reproducía el bug (mensaje + reintento a 0.3s) ya no falla — ambos turnos
+`ok=True`, cero `StaleSessionError` en los logs. 173 tests de backend en
+verde.
+
 ## F7 · `feature/feedback-evals` · P1
 
 DoD: scores visibles en Langfuse; evalset corre.

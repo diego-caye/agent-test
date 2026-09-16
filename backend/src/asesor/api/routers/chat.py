@@ -108,7 +108,7 @@ async def chat_stream(
     # En segundo plano: titular la conversación no debe sumar latencia al turno
     # ni romperlo si el modelo ligero falla.
     background.add_task(
-        container.title_service.ensure_title, str(user_id), body.session_id, body.message
+        container.title_service.ensure_title, user_id, body.session_id, body.message
     )
 
     events = service.run_turn(user_id, body.session_id, body.message, fault)

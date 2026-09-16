@@ -71,7 +71,7 @@ async def clean_database(settings: Settings) -> None:
     async with engine.begin() as connection:
         await connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await connection.run_sync(Base.metadata.create_all)
-        await connection.execute(text("TRUNCATE TABLE leads, handoffs, kb_chunks"))
+        await connection.execute(text("TRUNCATE TABLE leads, handoffs, kb_chunks, session_titles"))
     await engine.dispose()
 
 

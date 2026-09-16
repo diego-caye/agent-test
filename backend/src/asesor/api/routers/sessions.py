@@ -14,7 +14,6 @@ from asesor.api.dtos import (
 )
 from asesor.api.errors import NotFoundError
 from asesor.application.chat_service import ChatService, SessionNotFoundError
-from asesor.application.title_service import TITLE_STATE_KEY
 from asesor.infrastructure.container import Container
 
 router = APIRouter(prefix="/api/v1/sessions", tags=["sessions"])
@@ -38,11 +37,14 @@ async def create_session(request: Request, user_id: UserId) -> CreateSessionResp
 
 @router.get("", response_model=list[SessionSummary])
 async def list_sessions(request: Request, user_id: UserId) -> list[SessionSummary]:
+    container = _container(request)
     sessions = await _chat_service(request).list_sessions(user_id)
+    # Un solo round-trip para todos los títulos, no uno por sesión (spec 06).
+    titles = await container.session_titles.get_many([session.id for session in sessions])
     summaries = [
         SessionSummary(
             session_id=session.id,
-            titulo=session.state.get(TITLE_STATE_KEY) or None,
+            titulo=titles.get(session.id),
             last_update_time=datetime.fromtimestamp(session.last_update_time, tz=UTC),
             etapa=read_dialog_state(session.state).stage.value,
         )
@@ -57,6 +59,9 @@ async def delete_session(request: Request, user_id: UserId, session_id: str) -> 
         await _chat_service(request).delete_session(user_id, session_id)
     except SessionNotFoundError as exc:
         raise NotFoundError("Session not found") from exc
+    # El título vive aparte de la sesión de ADK (ver title_service): borrar
+    # la sesión no lo arrastra solo, hay que limpiarlo a mano.
+    await _container(request).session_titles.delete(session_id)
 
 
 @router.get("/{session_id}/messages", response_model=list[MessageDto])

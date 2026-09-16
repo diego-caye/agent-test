@@ -59,6 +59,25 @@ class HandoffRow(Base):
     )
 
 
+class SessionTitleRow(Base):
+    """El título de una conversación, fuera de la sesión de ADK a propósito.
+
+    Guardarlo como estado de sesión (un append_event con state_delta) competía
+    por el mismo lock optimista que el turno de chat: si el título se escribía
+    mientras un turno siguiente en la misma sesión seguía en vuelo, el append
+    del propio turno salía rechazado con StaleSessionError — un adorno de la
+    barra lateral tumbando la respuesta real. Una tabla aparte no comparte ese
+    candado con nada.
+    """
+
+    __tablename__ = "session_titles"
+
+    session_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(PgUUID(as_uuid=True), index=True)
+    title: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class KbChunkRow(Base):
     __tablename__ = "kb_chunks"
 
