@@ -28,9 +28,11 @@ Python 3.12 + uv + FastAPI + Pydantic v2 + SQLAlchemy 2 async + Alembic + `googl
 
 ## Modelos locales
 
-El proyecto corre **sin ninguna API key**: agente `ollama_chat/gemma4:latest` con `OLLAMA_THINK=low` y contexto 32768, embeddings `embeddinggemma`. Gemini sigue disponible cambiando variables de entorno; los dos perfiles están en `.env.example`.
+El proyecto corre **sin ninguna API key**: agente `ollama_chat/gemma4:12b` con `OLLAMA_THINK=low` y contexto 32768, embeddings `embeddinggemma:300m`. Gemini sigue disponible cambiando variables de entorno; los dos perfiles están en `.env.example`.
 
-Antes de cambiar de modelo, leer `specs/decisions/ADR-003-modelos-locales.md`. Lo esencial: si `docker exec <ollama> ollama ps` no dice `100% GPU`, el modelo no entra y la latencia se multiplica — revisar VRAM libre **y** la RAM de la VM de WSL (`%USERPROFILE%\.wslconfig`).
+**Todo dentro de Docker por defecto, nada nativo.** `COMPOSE_PROFILES=local-llm` en `.env.example` hace que `docker compose up -d` (sin ningún flag) ya incluya Ollama y le baje los cuatro modelos que hacen falta — quien clone el repo con solo Docker no necesita instalar Ollama en su máquina. El catálogo del selector para Ollama no se declara a mano (`MODEL_CHOICES`): se descubre en vivo contra `/api/tags` + `/api/show` al arrancar el backend (`infrastructure/llm/ollama_discovery.py`, spec 11 §3.1), con sus capacidades reales (piensa / usa tools).
+
+Antes de cambiar de modelo, leer `specs/decisions/ADR-003-modelos-locales.md`. Lo esencial: si `docker compose exec ollama ollama ps` no dice `100% GPU`, el modelo no entra y la latencia se multiplica — revisar VRAM libre **y** la RAM de la VM de WSL (`%USERPROFILE%\.wslconfig`).
 
 ## Comandos
 

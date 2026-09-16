@@ -2,12 +2,16 @@
 # no por archivos de override: así `docker compose up -d` siempre funciona y no
 # hay que recordar una cadena de `-f`.
 #
-#   docker compose up -d                        db + backend + frontend
-#   docker compose --profile local-llm up -d    + Ollama dentro del proyecto
+#   docker compose up -d                        db + backend + frontend (+ ollama, ver abajo)
+#   docker compose --profile local-llm up -d    fuerza el perfil aunque no esté en .env
 #
-# El perfil local-llm asume GPU NVIDIA con el container toolkit instalado. Sin
-# GPU (o con Ollama ya corriendo en el host, que es lo habitual en Windows),
-# omite el perfil y deja OLLAMA_API_BASE_CONTAINER apuntando al host.
+# .env.example trae COMPOSE_PROFILES=local-llm: con eso, el primer comando ya
+# incluye el servicio "ollama" y el job que le baja los modelos — todo dentro
+# de Docker, sin depender de un Ollama nativo instalado en la máquina de quien
+# clone el repo. El perfil asume GPU NVIDIA con el container toolkit
+# instalado. Sin GPU, o para usar un Ollama nativo en su lugar (mejor acceso a
+# GPU en algunos equipos), quita COMPOSE_PROFILES del .env y apunta
+# OLLAMA_API_BASE_CONTAINER a http://host.docker.internal:11434.
 #
 # backend y frontend montan el código fuente y recargan solos: editar un .py o
 # un .tsx se ve al instante, sin `--build`. Solo hace falta reconstruir cuando
