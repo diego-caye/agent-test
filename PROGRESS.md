@@ -871,3 +871,27 @@ caso dudoso, en vez de confiar ciegamente en el resultado del script.
 Los dos bugs reales de este repaso (el cruce de proveedor del respaldo,
 y este de L4) sí se confirmaron con datos crudos de Postgres antes de
 tocar código.
+
+### Reportado en vivo por el humano: declinar una derivación no "se quedaba" cancelado
+
+Screenshots del propio humano usando la app mostraron la tarjeta de
+confirmación reapareciendo justo después de declinarla. Diagnóstico con
+los eventos crudos de ADK (no una suposición): `pendiente_de_confirmacion`
+→ `confirmed=false` → `cancelado=true` → **`pendiente_de_confirmacion`
+otra vez**, todo en el mismo turno — el modelo, tras enterarse de que el
+usuario canceló, volvía a llamar `solicitar_contacto_humano` por su
+cuenta, porque el pedido original seguía calificando para derivar y la
+instrucción nunca decía qué hacer con un `cancelado=true`.
+
+- [x] Regla explícita en la instrucción: si la tool devuelve `cancelado`,
+  no volver a llamarla en el mismo turno. Verificado a mano contra
+  `gemma4:12b` real (no hay evalset automático posible: `FakeAdkLlm` no
+  razona) — tras declinar, la tarjeta ya no reaparece.
+- [x] El eco de la derivación (ticket o "Ahora no") se movió de una
+  barra fija junto al composer a debajo del último mensaje de la
+  conversación (dentro de `MessageList`, mismo patrón que feedback y
+  reintentar) — a pedido del humano, para que se lea como parte de esa
+  respuesta puntual.
+
+Suite completa: 196 tests de backend, mypy y ruff limpios; typecheck,
+build y 24 tests de frontend limpios.
