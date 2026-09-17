@@ -1,10 +1,10 @@
-import { CircleCheckBig, UserRoundCheck } from 'lucide-react'
+import { CircleCheckBig, CircleX, UserRoundCheck } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 import { CANAL_LABEL, MOTIVO_LABEL } from '../chat/labels'
-import type { Confirmation, Handoff } from '../chat/reducer'
+import type { Confirmation, DeclinedConfirmation, Handoff } from '../chat/reducer'
 
 type Props = {
   confirmation: Confirmation
@@ -61,8 +61,25 @@ export function HandoffNotice({ handoff }: { handoff: Handoff }) {
       role="status"
     >
       <CircleCheckBig className="size-4 shrink-0" aria-hidden="true" />
-      {handoff.ya_existia ? 'Ya tenías una solicitud en curso' : 'Solicitud enviada'} ·{' '}
+      ¿Te derivamos con un asesor? · {handoff.ya_existia ? 'Ya tenías una solicitud en curso' : 'Sí, derivar'} ·{' '}
       <span className="tabular font-semibold">{handoff.ticket}</span>
+    </p>
+  )
+}
+
+// Cancelar no crea nada (spec 03 §3), así que a diferencia de HandoffNotice
+// no hay ticket que mostrar -- solo el eco de la pregunta y la decisión,
+// para que no quede como si la tarjeta simplemente hubiera desaparecido sola.
+export function DeclinedNotice({ declined }: { declined: DeclinedConfirmation }) {
+  const motivo = MOTIVO_LABEL[declined.motivo] ?? 'hablar con un asesor'
+
+  return (
+    <p
+      className="text-muted-foreground bg-card mx-auto flex max-w-2xl items-center gap-2 rounded-lg border px-4 py-2.5 text-sm"
+      role="status"
+    >
+      <CircleX className="size-4 shrink-0" aria-hidden="true" />
+      ¿Te derivamos para {motivo}? · Ahora no
     </p>
   )
 }
