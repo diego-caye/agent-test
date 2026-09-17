@@ -73,7 +73,6 @@ def _text_of(event: Event) -> str:
 async def translate(events: AsyncIterator[Event], trace_id: str) -> AsyncIterator[SseEvent]:
     metrics = TurnMetrics()
     tool_started_at: dict[str, float] = {}
-    awaiting_confirmation = False
     reported_error = False
     # El texto del modelo se acumula en vez de reenviarse fragmento a fragmento:
     # L4 solo puede juzgar la respuesta completa, y una vez transmitido un delta
@@ -81,8 +80,23 @@ async def translate(events: AsyncIterator[Event], trace_id: str) -> AsyncIterato
     buffered = ""
     last_text = ""
     last_event_id = ""
+    # Spec 02 §2: un turno con HITL pendiente cierra el stream al pedir la
+    # confirmación, sin más eventos. No se corta la iteración de `events` en
+    # sí (interrumpirla a medias dispara GeneratorExit dentro de los context
+    # managers propios de ADK -- contextvars de OpenTelemetry atados a la
+    # Task que conduce el generador -- y tumba el turno real: reproducido
+    # con los AT de HITL). Se sigue drenando `events` hasta el final para que
+    # ADK cierre sus propios recursos con normalidad, pero se deja de
+    # traducir/emitir cualquier cosa después de la confirmación -- sin este
+    # corte, ADK a veces sigue generando eventos de la MISMA invocación
+    # después de pedirla (visto en vivo con gemma4:12b: el mismo turno
+    # termina en un message.completed real con texto, minutos después,
+    # mientras la tarjeta de confirmación sigue pendiente en pantalla).
+    confirmation_pending = False
 
     async for event in events:
+        if confirmation_pending:
+            continue
         metrics.observe(event)
         last_event_id = event.id or last_event_id
 
@@ -114,11 +128,14 @@ async def translate(events: AsyncIterator[Event], trace_id: str) -> AsyncIterato
 
         for call in event.get_function_calls():
             if call.name == CONFIRMATION_CALL_NAME:
-                awaiting_confirmation = True
                 yield _confirmation_event(call)
-                continue
+                confirmation_pending = True
+                break
             tool_started_at[call.name or ""] = time.perf_counter()
             yield SseEvent("tool.started", {"name": call.name})
+
+        if confirmation_pending:
+            continue
 
         for response in event.get_function_responses():
             name = response.name or ""
@@ -160,10 +177,13 @@ async def translate(events: AsyncIterator[Event], trace_id: str) -> AsyncIterato
                 # La respuesta no parcial ya pasó por L4, así que es la que vale.
                 last_text = text
 
+    if confirmation_pending:
+        return
+
     final_text = last_text or buffered
     if final_text:
         yield SseEvent("message.delta", {"delta": final_text})
-    elif not (awaiting_confirmation or reported_error):
+    elif not reported_error:
         # Un turno sin texto visible deja una burbuja vacía. Pasa cuando el
         # modelo solo emite razonamiento: se ha visto con Gemma 4 vía Ollama.
         logger.warning("turno sin texto visible", extra={"trace_id": trace_id})
