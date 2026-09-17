@@ -464,8 +464,50 @@ DoD: scores visibles en Langfuse; evalset corre.
 
 - [x] `POST /feedback`
 - [x] Evaluación post-ejecución en background
-- [ ] `EventsCompactionConfig` afinado
+- [x] `EventsCompactionConfig` afinado
 - [x] Evalset ADK
+
+**F7 completo.** Solo queda F9 para cerrar el proyecto.
+
+### `EventsCompactionConfig` afinado con conversaciones reales
+
+Dos hallazgos reales al investigar antes de tocar el número, no una
+adivinanza (leyendo `google/adk/apps/compaction.py`, verificado en vivo):
+
+1. **Sin `summarizer` explícito, la compactación usaba el modelo grande del
+   propio agente para resumir** (`agent.canonical_model`), en la misma
+   llamada síncrona que cierra el turno — justo cuando la conversación ya es
+   larga, el peor momento para sumarle otra llamada al modelo principal.
+   `create_adk_app` ahora recibe el mismo modelo ligero que ya titula
+   conversaciones (`GUARDRAIL_MODEL`) y se lo pasa explícito a
+   `LlmEventSummarizer`. Un solo modelo de utilidad, no dos instancias.
+2. **El número que dispara la compactación no es el `tokens_in` que muestra
+   el panel dev.** Ese metric suma todas las llamadas al modelo de un turno
+   (incluidas las de tool-calling); el disparador de ADK compara contra el
+   `prompt_token_count` de la **última** llamada nada más. Confirmado
+   inspeccionando una sesión real: un turno con `tokens_in=8249` (dos
+   llamadas, 3817+4432) dejaba en 4432 el valor que ADK de verdad compara.
+
+Con el umbral original (12000, puesto en F2 sin conversación real de por
+medio) **la compactación no llegó a dispararse ni una vez** en una
+conversación de 10 turnos con captura de lead y preguntas técnicas — el
+crecimiento real ronda 300-700 tokens/turno con `gemma4:12b`. Bajado a
+**6000**: dispararía alrededor del turno 8-10 de una conversación larga
+(margen amplio frente a los 32768 de `OLLAMA_CONTEXT_LENGTH`), sin activarse
+en los intercambios cortos de 2-5 turnos que son el caso común de este
+asesor.
+
+Verificado en vivo forzando el disparo con un umbral bajo (1500, temporal,
+solo para la prueba): 3 compactaciones reales en la misma sesión, cero
+errores y cero `StaleSessionError` (ADK ya maneja esa carrera de origen —
+la misma que tuvimos que resolver a mano para `session_titles`, spec 06 §1
+— con su propio try/except), y el resumen generado por el modelo ligero
+conservó nombre, uso principal, etapa, qué tool se llamó y qué pregunta
+quedó sin responder. Con 6000 en una conversación de 5 turnos, no se
+disparó — consistente con el crecimiento medido, no una sorpresa.
+
+1 test nuevo (`test_agent_factory.py`, fija que se usa el modelo ligero y no
+el del agente). Suite completa: 191 tests, mypy y ruff limpios.
 
 ### Langfuse real configurado y `POST /feedback` + evaluación en background
 
