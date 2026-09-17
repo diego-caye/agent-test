@@ -790,3 +790,37 @@ una respuesta → aparece en el panel con el texto exacto de esa respuesta
 la de origen, verificado por comparación exacta). Suite completa: 196
 tests de backend, mypy y ruff limpios; typecheck, build y 24 tests de
 frontend limpios.
+
+- [x] Borrar una conversación limpia también su feedback (`delete_for_session`
+  en el repositorio, llamado desde `DELETE /sessions/{id}` junto al borrado
+  de `session_titles` que ya existía) — a pedido del humano, para que el
+  panel no liste feedback de una sesión que ya no existe.
+
+### Verificado con Gemini, no solo con modelos locales — 3 bugs reales
+
+A pedido del humano: grabar la demo en local pondría lento el equipo, así
+que hacía falta confirmar que todo funciona igual con Gemini. Verificarlo
+de verdad (no asumirlo) sacó tres bugs que nunca se habían visto porque
+toda la sesión se había probado con Ollama de punta a punta:
+
+- [x] **El modelo de respaldo cruzaba de proveedor mal.**
+  `build_fallback_model` ramificaba por el proveedor del modelo
+  *principal* elegido, no por el propio `FALLBACK_MODEL`. Con Gemini
+  seleccionado y `FALLBACK_MODEL` en Ollama (el default de este repo),
+  construía un `Gemini(model="ollama_chat/llama3.2:3b")` — 404 real
+  contra la API de Gemini en cuanto el principal fallaba tres veces.
+  Visto en vivo: Gemini devolvió `503 "high demand"` real mientras se
+  probaba, y el respaldo se rompió en vez de rescatar el turno. Arreglado
+  para leer el prefijo `ollama_chat/` del propio `FALLBACK_MODEL`. 3 tests
+  nuevos (`test_fallback_model.py`) — no había ninguna cobertura antes.
+- [x] Los chips de actividad usaban el nombre de la tool como key de React
+  (`item.name`), que no es única si la misma tool se llama más de una vez
+  en un turno — pasó con Gemini y disparó el aviso de consola "two
+  children with the same key". Confirmado contra los eventos crudos de
+  ADK que no era una tool ejecutándose dos veces de verdad, solo la key.
+  Se enumera antes de filtrar, la key combina nombre + posición original.
+
+Verificado en el navegador contra el stack real con Gemini seleccionado
+(saludo+lead, RAG, HITL con ticket) vía Playwright: cero errores de
+consola. Suite completa: 196 tests de backend (3 nuevos), mypy y ruff
+limpios; typecheck, build y 24 tests de frontend limpios.
