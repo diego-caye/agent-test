@@ -31,6 +31,7 @@ export default function App() {
     openSession,
     removeSession,
     answerConfirmation,
+    sendFeedback,
   } = useChat()
   const [showDevPanel, setShowDevPanel] = useState(readDevPanelPreference)
 
@@ -98,6 +99,8 @@ export default function App() {
           onRetry={() => void retry()}
           onEdit={(text) => void editAndResend(text)}
           isLocalModel={models.find((model) => model.id === modelId)?.provider === 'ollama'}
+          traceId={state.metrics?.trace_id ?? null}
+          onFeedback={(traceId, score) => void sendFeedback(traceId, score)}
         />
 
         <div className="flex flex-col gap-3 border-t px-4 py-4 sm:px-8">

@@ -82,6 +82,11 @@ export const api = {
   deleteSession: (sessionId: string) =>
     request<void>(`/api/v1/sessions/${sessionId}`, { method: 'DELETE' }),
   listModels: () => request<ModelOption[]>('/api/v1/models'),
+  sendFeedback: (sessionId: string, traceId: string, score: 1 | -1) =>
+    request<{ ok: boolean }>('/api/v1/feedback', {
+      method: 'POST',
+      body: JSON.stringify({ session_id: sessionId, trace_id: traceId, score }),
+    }),
 }
 
 // Exportada solo para que el test del timeout pueda pasar un plazo corto y
