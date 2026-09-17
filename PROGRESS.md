@@ -724,3 +724,36 @@ transiciones de estado y AT/guardrails ✅.
 Frontend: typecheck, build y 22 tests de vitest limpios.
 
 Suite completa: 192 tests, mypy y ruff limpios.
+
+### Segundo repaso contra el PDF, a pedido del humano
+
+Releído el PDF completo (MVP, entregables y rúbrica) de nuevo, no solo la
+memoria de la ronda anterior. Un hallazgo real:
+
+- [x] **"Asesor general, no asociado a marcas específicas ni sistemas de
+  fondos colectivos" nunca estaba en la instrucción del agente** — es el
+  primer punto del MVP en el enunciado, palabra por palabra, y ni
+  `instruction.py` ni la spec 05 lo mencionaban. El comportamiento correcto
+  salía porque la KB no tiene datos de marcas ni de ese producto (regla
+  implícita, no diseñada) — funcionaba, pero por accidente de qué hay en la
+  KB, no por una regla del agente. Se agregó la regla explícita al ROL de
+  la instrucción y a la spec 05 (fila 11 de la tabla de cambios).
+  Verificado contra el modelo real: los casos del evalset
+  `saludo-generico` y `fondos-colectivos` siguen pasando sin cambios de
+  comportamiento. 192 tests, mypy y ruff limpios.
+
+Verificado también, sin encontrar nada nuevo que cambiar: las spans de
+`execute_tool` (una por tool llamada, ej. `solicitar_contacto_humano`)
+aparecen en Langfuse junto a `call_llm`/`agent_run`/`invocation` — la
+"visualización de tool calls" de la rúbrica de Observabilidad (10%) ya
+estaba cubierta por la instrumentación propia de ADK, sin código nuestro
+de más. Confirmado contra el Langfuse real vía `GET
+/api/public/v2/observations`, no solo asumido.
+
+**Único bloqueante real que queda:** no existe repositorio remoto en
+GitHub/GitLab. Es un entregable explícito de la rúbrica ("Repositorio de
+Código... se valorará el uso correcto de la gestión de ramificación en
+Git") y el único canal de entrega es el link público por correo — sin
+esto no hay nada que evaluar. Todo el historial local (`main`, `develop`,
+merge commits por fase) ya está listo para empujarlo tal cual en cuanto
+exista el remoto.
