@@ -1,11 +1,11 @@
-"""AT-01, AT-02, AT-03 y AT-19 de specs/09-acceptance-tests.md."""
+"""AT-01, AT-02, AT-03, AT-05 y AT-19 de specs/09-acceptance-tests.md."""
 
 import asyncio
 from uuid import UUID, uuid4
 
 from httpx import AsyncClient
 
-from asesor.agent.instruction import CANNED_SALUDO_SIN_NOMBRE
+from asesor.agent.instruction import CANNED_SALUDO_SIN_NOMBRE, CANNED_SOLO_MIRANDO
 from asesor.infrastructure.llm.fake import FakeAdkLlm, FakeTurn
 from tests.support.sse import reply_text, send_message, tool_names
 
@@ -89,6 +89,34 @@ async def test_at03_no_repregunta_datos_que_ya_estan_en_la_ficha(
     assert '"uso_principal": "FAMILIA"' in instruction
     assert '"nombre": "Diego"' in instruction
     assert "Nunca vuelvas a preguntar un dato que ya aparece en la ficha" in instruction
+
+
+async def test_at05_solo_estoy_mirando_activa_el_modo_y_persiste(
+    client: AsyncClient, fake_llm: FakeAdkLlm, user_id: UUID
+) -> None:
+    fake_llm.turns = [
+        FakeTurn(tool_name="guardar_lead", tool_args={"solo_mirando": True}),
+        FakeTurn(text=CANNED_SOLO_MIRANDO),
+    ]
+    session_id = await new_session(client, user_id)
+
+    events = await send_message(client, user_id, session_id, "por ahora solo estoy mirando")
+
+    assert tool_names(events) == ["guardar_lead"]
+    assert reply_text(events) == CANNED_SOLO_MIRANDO
+    assert not any(e.event == "error" for e in events)
+
+    lead = await client.get(
+        f"/api/v1/sessions/{session_id}/lead", headers={"X-User-Id": str(user_id)}
+    )
+    assert lead.json()["solo_mirando"] is True
+    # No mandó ningún dato del lead: la ficha sigue vacía, solo cambió la intención.
+    assert lead.json()["lead"]["nombre"] is None
+
+    fake_llm.turns = [FakeTurn(text="Claro, aquí estoy si tienes dudas.")]
+    await send_message(client, user_id, session_id, "ok")
+
+    assert 'Modo "solo mirando" activo: sí' in fake_llm.instructions[-1]
 
 
 async def test_at19_dos_sesiones_concurrentes_sin_fuga(
