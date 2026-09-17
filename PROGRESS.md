@@ -940,3 +940,11 @@ había registrado cortaba el turno a medias.
 Verificado en el navegador (bubble + eco visibles de inmediato y
 sobreviven a mandar otro mensaje). Suite completa: 196 tests de backend,
 mypy y ruff limpios; typecheck, build y 24 tests de frontend limpios.
+
+- [x] **Panel de feedback se actualiza solo.** Reportado en vivo: dar
+  like/dislike no hacía aparecer la fila en el panel dev hasta recargar
+  la pestaña (la sección solo cargaba una vez, al montar). `sendFeedback`
+  expone un contador `feedbackVersion` que sube en cada POST exitoso;
+  `FeedbackSection` lo agrega a su propio efecto de carga. Verificado en
+  el navegador: like con el panel abierto → la fila aparece sola en
+  segundos.
