@@ -758,3 +758,35 @@ Git") y el único canal de entrega es el link público por correo — sin
 esto no hay nada que evaluar. Todo el historial local (`main`, `develop`,
 merge commits por fase) ya está listo para empujarlo tal cual en cuanto
 exista el remoto.
+
+### Panel de feedback en el DevPanel, a pedido del humano
+
+Probar el feedback via `psql` contra la tabla real funcionaba pero era
+poco demostrable en vivo. Se movió a la propia UI:
+
+- [x] `feedback` gana la columna `message` (NOT NULL, migración
+  `aa3ad54be751`): el texto de la respuesta del agente que se calificó,
+  denormalizado al momento del feedback en vez de un join contra el
+  historial de ADK — así el panel puede listarlo aunque la sesión se haya
+  compactado o borrado. Las 2 filas de prueba de antes (sin `message`,
+  de antes de este cambio) se borraron.
+- [x] `GET /api/v1/feedback?limit=` (admin, spec 02): mismo mecanismo de
+  `admin_token` por Bearer que `/handoffs` — cruza sesiones ajenas, no
+  puede colgar del `X-User-Id` normal. `require_admin`/`Admin` se movió
+  de `routers/handoffs.py` a `api/dependencies.py` (vivía duplicado
+  palabra por palabra, ahora `/feedback` lo reusa).
+- [x] Panel dev, nueva sección "Feedback": pide el `admin_token` una vez
+  (con recuerdo en `localStorage`, igual que la preferencia de mostrar el
+  panel), lista lo más reciente primero con ícono 👍/👎, mensaje y fecha,
+  y cada fila es clickeable — navega a `/c/:session_id` de esa
+  conversación (reusa `openSession`, ya existente para la barra lateral).
+- [x] Tipos regenerados desde `/openapi.json` (`FeedbackDto` nuevo).
+- [x] 3 tests nuevos de backend (mensaje requerido, listado admin-gated,
+  orden por fecha) más los 2 existentes ajustados al campo nuevo.
+
+Verificado en el navegador contra el stack real con Playwright: like a
+una respuesta → aparece en el panel con el texto exacto de esa respuesta
+→ clic en la fila navega de vuelta a la sesión original (URL idéntica a
+la de origen, verificado por comparación exacta). Suite completa: 196
+tests de backend, mypy y ruff limpios; typecheck, build y 24 tests de
+frontend limpios.

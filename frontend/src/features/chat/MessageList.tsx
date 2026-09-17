@@ -23,7 +23,7 @@ type Props = {
   // trace_id del último turno completado (spec 08 §4): sin él no hay a qué
   // trace adjuntarle el score en Langfuse, así que no se ofrece feedback.
   traceId: string | null
-  onFeedback: (traceId: string, score: 1 | -1) => void
+  onFeedback: (traceId: string, score: 1 | -1, message: string) => void
 }
 
 export function MessageList({
@@ -71,7 +71,7 @@ export function MessageList({
             showFeedback={
               !streaming && message.role === 'agent' && message.id === lastMessage?.id && Boolean(traceId)
             }
-            onFeedback={(score) => traceId && onFeedback(traceId, score)}
+            onFeedback={(score) => traceId && onFeedback(traceId, score, message.content)}
           />
         ))}
 

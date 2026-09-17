@@ -50,11 +50,22 @@ class FeedbackRequest(BaseModel):
     session_id: str
     trace_id: str
     score: Literal[1, -1]
+    message: str = Field(min_length=1, max_length=4000)
     comment: str | None = Field(default=None, max_length=500)
 
 
 class FeedbackResponse(BaseModel):
     ok: bool = True
+
+
+class FeedbackDto(BaseModel):
+    id: int
+    session_id: str
+    trace_id: str
+    score: int
+    message: str
+    comment: str | None = None
+    created_at: datetime
 
 
 class ModelOption(BaseModel):

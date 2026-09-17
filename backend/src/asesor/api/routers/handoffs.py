@@ -1,9 +1,8 @@
-from typing import Annotated
+from fastapi import APIRouter, Request
 
-from fastapi import APIRouter, Depends, Header, Request
-
+from asesor.api.dependencies import Admin
 from asesor.api.dtos import HandoffDto, UpdateHandoffRequest
-from asesor.api.errors import ConflictError, NotFoundError, UnauthorizedError
+from asesor.api.errors import ConflictError, NotFoundError
 from asesor.application.handoff_service import (
     HandoffNotFoundError,
     InvalidHandoffTransitionError,
@@ -13,16 +12,6 @@ from asesor.domain.enums import HandoffStatus
 from asesor.infrastructure.container import Container
 
 router = APIRouter(prefix="/api/v1/handoffs", tags=["handoffs"])
-
-
-def require_admin(request: Request, authorization: Annotated[str | None, Header()] = None) -> None:
-    container: Container = request.app.state.container
-    expected = f"Bearer {container.settings.admin_token}"
-    if not authorization or authorization != expected:
-        raise UnauthorizedError("Admin token required")
-
-
-Admin = Annotated[None, Depends(require_admin)]
 
 
 def _to_dto(handoff: Handoff) -> HandoffDto:

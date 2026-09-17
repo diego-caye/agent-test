@@ -187,6 +187,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Feedback */
+        get: operations["list_feedback_api_v1_feedback_get"];
+        put?: never;
+        /** Submit Feedback */
+        post: operations["submit_feedback_api_v1_feedback_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -217,6 +235,50 @@ export interface components {
         CreateSessionResponse: {
             /** Session Id */
             session_id: string;
+        };
+        /** FeedbackDto */
+        FeedbackDto: {
+            /** Id */
+            id: number;
+            /** Session Id */
+            session_id: string;
+            /** Trace Id */
+            trace_id: string;
+            /** Score */
+            score: number;
+            /** Message */
+            message: string;
+            /** Comment */
+            comment?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** FeedbackRequest */
+        FeedbackRequest: {
+            /** Session Id */
+            session_id: string;
+            /** Trace Id */
+            trace_id: string;
+            /**
+             * Score
+             * @enum {integer}
+             */
+            score: 1 | -1;
+            /** Message */
+            message: string;
+            /** Comment */
+            comment?: string | null;
+        };
+        /** FeedbackResponse */
+        FeedbackResponse: {
+            /**
+             * Ok
+             * @default true
+             */
+            ok: boolean;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -705,6 +767,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ModelOption"][];
+                };
+            };
+        };
+    };
+    list_feedback_api_v1_feedback_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackDto"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submit_feedback_api_v1_feedback_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeedbackRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

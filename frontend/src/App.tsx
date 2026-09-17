@@ -100,7 +100,7 @@ export default function App() {
           onEdit={(text) => void editAndResend(text)}
           isLocalModel={models.find((model) => model.id === modelId)?.provider === 'ollama'}
           traceId={state.metrics?.trace_id ?? null}
-          onFeedback={(traceId, score) => void sendFeedback(traceId, score)}
+          onFeedback={(traceId, score, message) => void sendFeedback(traceId, score, message)}
         />
 
         <div className="flex flex-col gap-3 border-t px-4 py-4 sm:px-8">
@@ -148,6 +148,7 @@ export default function App() {
           etapa={state.etapa}
           metrics={state.metrics}
           onClose={() => toggleDevPanel(false)}
+          onOpenSession={(id) => void openSession(id)}
         />
       </SidebarProvider>
     </SidebarProvider>
