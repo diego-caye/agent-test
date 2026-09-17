@@ -16,6 +16,11 @@ type Props = {
 }
 
 const LANGFUSE_PROJECT = import.meta.env['VITE_LANGFUSE_PROJECT_ID'] as string | undefined
+// Sin esto, un plan que no vive en el cloud.langfuse.com por defecto (p. ej.
+// una region HIPAA con host propio) arma el link contra el host equivocado y
+// se queda "Loading..." para siempre (visto en vivo).
+const LANGFUSE_HOST =
+  (import.meta.env['VITE_LANGFUSE_HOST'] as string | undefined) || 'https://cloud.langfuse.com'
 
 export function DevPanel({ lead, etapa, metrics, onClose }: Props) {
   const record = (lead ?? {}) as Record<string, unknown>
@@ -79,7 +84,7 @@ export function DevPanel({ lead, etapa, metrics, onClose }: Props) {
           {metrics && LANGFUSE_PROJECT && (
             <Button asChild variant="link" size="xs" className="mt-2 px-0">
               <a
-                href={`https://cloud.langfuse.com/project/${LANGFUSE_PROJECT}/traces/${metrics.trace_id}`}
+                href={`${LANGFUSE_HOST}/project/${LANGFUSE_PROJECT}/traces/${metrics.trace_id}`}
                 target="_blank"
                 rel="noreferrer"
               >
