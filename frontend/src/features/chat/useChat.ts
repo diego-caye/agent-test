@@ -188,6 +188,14 @@ export function useChat() {
       const pending = state.pendingConfirmation
       if (!sessionId || !pending) return
 
+      if (!approved) {
+        // Cancelar no crea nada (spec 03 §3): a diferencia de aprobar, donde
+        // el aviso de ticket llega con el evento handoff.created, no hay
+        // ningún evento de servidor que quite la tarjeta -- se quita de
+        // inmediato en vez de esperar a que termine el turno reanudado.
+        dispatch({ type: 'confirmation-declined' })
+      }
+
       const controller = new AbortController()
       abortRef.current = controller
       await consume(

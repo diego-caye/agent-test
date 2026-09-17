@@ -18,11 +18,18 @@ export type Confirmation = {
 
 export type Handoff = { ticket: string; ya_existia: boolean }
 
+// Eco de la tarjeta de confirmación una vez que el usuario dijo "Ahora no":
+// a diferencia de aprobar (donde handoff.created ya cuenta la historia con
+// el ticket), cancelar no crea nada, así que sin esto no queda ningún
+// rastro de qué se preguntó ni qué se contestó.
+export type DeclinedConfirmation = { motivo: string }
+
 export type ChatState = {
   messages: Message[]
   activity: Activity[]
   pendingConfirmation: Confirmation | null
   handoff: Handoff | null
+  declinedConfirmation: DeclinedConfirmation | null
   lead: LeadDto | null
   etapa: Etapa
   metrics: TurnMetrics | null
@@ -36,6 +43,7 @@ export const initialChatState: ChatState = {
   activity: [],
   pendingConfirmation: null,
   handoff: null,
+  declinedConfirmation: null,
   lead: null,
   etapa: 'NUEVO',
   metrics: null,
@@ -68,6 +76,11 @@ export type ChatAction =
   | { type: 'turn-start' }
   | { type: 'server'; event: ServerEvent }
   | { type: 'turn-failed'; message: string }
+  // Cancelar no crea nada (spec 03 §3): a diferencia de aprobar, donde la
+  // tarjeta la quita el propio evento handoff.created, cancelar no tiene
+  // ningún evento de servidor que "avise" que ya se resolvió -- hay que
+  // quitarla a mano en cuanto el usuario decide, sin esperar al backend.
+  | { type: 'confirmation-declined' }
 
 const AGENT_DRAFT_ID = 'agent-draft'
 
@@ -95,6 +108,7 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         ...state,
         error: null,
         handoff: null,
+        declinedConfirmation: null,
         lastUserMessage: action.content,
         messages: [
           ...state.messages,
@@ -131,6 +145,14 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
 
     case 'server':
       return applyServerEvent(state, action.event)
+
+    case 'confirmation-declined':
+      return {
+        ...clearConfirmation(state),
+        declinedConfirmation: state.pendingConfirmation
+          ? { motivo: state.pendingConfirmation.motivo }
+          : state.declinedConfirmation,
+      }
   }
 }
 

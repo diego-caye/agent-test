@@ -11,7 +11,7 @@ import { MessageList } from './features/chat/MessageList'
 import { ModelSelect } from './features/chat/ModelSelect'
 import { useChat } from './features/chat/useChat'
 import { DevPanel } from './features/devpanel/DevPanel'
-import { ConfirmationCard, HandoffNotice } from './features/hitl/ConfirmationCard'
+import { ConfirmationCard, DeclinedNotice, HandoffNotice } from './features/hitl/ConfirmationCard'
 import { Sidebar } from './features/sessions/Sidebar'
 
 const DEV_PANEL_KEY = 'asesor.devpanel'
@@ -113,6 +113,7 @@ export default function App() {
           )}
 
           {state.handoff && <HandoffNotice handoff={state.handoff} />}
+          {state.declinedConfirmation && <DeclinedNotice declined={state.declinedConfirmation} />}
 
           {/* El botón de reintentar vive junto al mensaje que se reenvía
               (MessageList), no aquí: uno solo al pie de la pantalla no

@@ -122,6 +122,38 @@ describe('chatReducer', () => {
     expect(state.handoff?.ticket).toBe('TICK-00001')
   })
 
+  it('al declinar, quita la confirmación pendiente y deja el eco de la decisión', () => {
+    const pending = apply(initialChatState, {
+      type: 'hitl.confirmation_required',
+      confirmation_id: 'conf-1',
+      motivo: 'TEST_DRIVE',
+      resumen: 'x',
+      canal_preferido: null,
+      urgencia: null,
+    })
+
+    const state = chatReducer(pending, { type: 'confirmation-declined' })
+
+    expect(state.pendingConfirmation).toBeNull()
+    expect(state.declinedConfirmation?.motivo).toBe('TEST_DRIVE')
+  })
+
+  it('un mensaje nuevo limpia el eco de una decisión anterior', () => {
+    const pending = apply(initialChatState, {
+      type: 'hitl.confirmation_required',
+      confirmation_id: 'conf-1',
+      motivo: 'TEST_DRIVE',
+      resumen: 'x',
+      canal_preferido: null,
+      urgencia: null,
+    })
+    const declined = chatReducer(pending, { type: 'confirmation-declined' })
+
+    const state = chatReducer(declined, { type: 'user-sent', content: 'otra cosa' })
+
+    expect(state.declinedConfirmation).toBeNull()
+  })
+
   it('expone el error y recuerda el último mensaje para reintentar', () => {
     const sent = chatReducer(initialChatState, { type: 'user-sent', content: 'hola' })
     const state = apply(sent, {
