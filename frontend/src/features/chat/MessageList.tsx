@@ -1,5 +1,5 @@
 import { type KeyboardEvent, useEffect, useRef, useState } from 'react'
-import { Pencil, RotateCcw } from 'lucide-react'
+import { Pencil, RotateCcw, ThumbsDown, ThumbsUp } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -20,6 +20,10 @@ type Props = {
   // El aviso de "el modelo local tarda" no tiene sentido con Gemini: ahí la
   // demora es de la API, no de cargar un modelo en la GPU de esta máquina.
   isLocalModel: boolean
+  // trace_id del último turno completado (spec 08 §4): sin él no hay a qué
+  // trace adjuntarle el score en Langfuse, así que no se ofrece feedback.
+  traceId: string | null
+  onFeedback: (traceId: string, score: 1 | -1) => void
 }
 
 export function MessageList({
@@ -30,6 +34,8 @@ export function MessageList({
   onRetry,
   onEdit,
   isLocalModel,
+  traceId,
+  onFeedback,
 }: Props) {
   const endRef = useRef<HTMLDivElement>(null)
   const lastMessage = messages.at(-1)
@@ -60,6 +66,12 @@ export function MessageList({
             retryDisabled={streaming}
             onRetry={onRetry}
             onEdit={onEdit}
+            // Mismo criterio de "es el último": solo la respuesta más reciente
+            // tiene sentido calificar, no una de en medio de la conversación.
+            showFeedback={
+              !streaming && message.role === 'agent' && message.id === lastMessage?.id && Boolean(traceId)
+            }
+            onFeedback={(score) => traceId && onFeedback(traceId, score)}
           />
         ))}
 
@@ -83,16 +95,30 @@ function Bubble({
   retryDisabled,
   onRetry,
   onEdit,
+  showFeedback,
+  onFeedback,
 }: {
   message: Message
   showRetry: boolean
   retryDisabled: boolean
   onRetry: () => void
   onEdit: (text: string) => void
+  showFeedback: boolean
+  onFeedback: (score: 1 | -1) => void
 }) {
   const isUser = message.role === 'user'
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(message.content)
+  // Local: una vez calificado un turno no se puede cambiar de opinión, y el
+  // estado no necesita sobrevivir a un refresh (no es información que el
+  // usuario espere recuperar, a diferencia del propio mensaje).
+  const [feedbackSent, setFeedbackSent] = useState<1 | -1 | null>(null)
+
+  function sendFeedback(score: 1 | -1) {
+    if (feedbackSent !== null) return
+    setFeedbackSent(score)
+    onFeedback(score)
+  }
 
   function startEdit() {
     setDraft(message.content)
@@ -189,6 +215,46 @@ function Bubble({
             <Pencil aria-hidden="true" />
             Editar
           </Button>
+        </div>
+      )}
+
+      {showFeedback && (
+        <div className="mt-1 flex items-center gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            onClick={() => sendFeedback(1)}
+            disabled={feedbackSent !== null}
+            aria-label="Buena respuesta"
+            title="Buena respuesta"
+            className={
+              feedbackSent === 1
+                ? 'text-ok'
+                : 'text-muted-foreground hover:text-foreground disabled:opacity-100'
+            }
+          >
+            <ThumbsUp aria-hidden="true" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            onClick={() => sendFeedback(-1)}
+            disabled={feedbackSent !== null}
+            aria-label="Mala respuesta"
+            title="Mala respuesta"
+            className={
+              feedbackSent === -1
+                ? 'text-destructive'
+                : 'text-muted-foreground hover:text-foreground disabled:opacity-100'
+            }
+          >
+            <ThumbsDown aria-hidden="true" />
+          </Button>
+          {feedbackSent !== null && (
+            <span className="text-muted-foreground text-xs">gracias por el feedback</span>
+          )}
         </div>
       )}
     </div>

@@ -198,6 +198,14 @@ export function useChat() {
     [sessionId, state.pendingConfirmation, modelId, consume, refreshSessions],
   )
 
+  const sendFeedback = useCallback(
+    async (traceId: string, score: 1 | -1) => {
+      if (!sessionId) return
+      await api.sendFeedback(sessionId, traceId, score)
+    },
+    [sessionId],
+  )
+
   const removeSession = useCallback(
     async (id: string) => {
       await api.deleteSession(id)
@@ -297,5 +305,6 @@ export function useChat() {
     openSession,
     removeSession,
     answerConfirmation,
+    sendFeedback,
   }
 }

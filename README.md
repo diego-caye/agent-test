@@ -32,6 +32,12 @@ Migración de un workflow de n8n a un backend propio con **Google ADK 2.x + Fast
 
 ## Arquitectura
 
+### Por qué Google ADK
+
+`google-adk` da `Runner`, `DatabaseSessionService` (memoria por sesión sobre Postgres) y confirmación de tools nativa (HITL) sin reinventar esa infraestructura, y separa el núcleo decisional de la UI — el requisito explícito del reto. Se evaluó LangGraph y se descartó por mayor esfuerzo de integración con Postgres y HITL para el alcance y plazo disponibles; mantener n8n se descartó por no cumplir "desacoplado de la UI" ni permitir tests ni observabilidad de grado producción. Detalle completo y trade-offs en [`specs/decisions/ADR-001-framework.md`](specs/decisions/ADR-001-framework.md).
+
+### Vista de componentes
+
 ```mermaid
 flowchart LR
     subgraph Cliente
@@ -64,6 +70,28 @@ flowchart LR
 ```
 
 **Regla de dependencia:** `api → application → domain ← infrastructure`. `domain/` no importa ADK, FastAPI ni SQLAlchemy — es código puro, testeable sin red. `agent/` depende de `application/`, nunca al revés: las tools son adaptadores delgados. Detalle completo, trade-offs y qué revisar si escala en [`specs/01-architecture.md`](specs/01-architecture.md).
+
+### Flujo de un turno (memoria, tools, HITL y guardrails)
+
+```mermaid
+flowchart LR
+    U(("Usuario")) -->|mensaje| G1["Guardrail L1\ndeterminista\n(inyección, longitud)"]
+    G1 -.->|bloqueado| U
+    G1 -->|ok| AG["Agent Luis"]
+
+    AG <-->|lee ficha del lead\ny etapa del diálogo| MEM[("Memoria\nDatabaseSessionService\n+ compactación de eventos")]
+
+    AG --> T1["Tool guardar_lead"]
+    AG --> T2["Tool search_knowledge_base\n(RAG sobre pgvector)"]
+    AG --> T3["Tool solicitar_contacto_humano"]
+
+    T3 --> HITL{"HITL\ntarjeta de confirmación\nen la UI"}
+    HITL -->|aprueba| HO[("handoff\nOPEN → IN_PROGRESS → CLOSED")]
+    HITL -->|cancela| AG
+
+    AG --> G4["Guardrail L4\nsobre la salida\n(canary / precios)"]
+    G4 -->|filtrado si hace falta| U
+```
 
 ## Qué cambia respecto al baseline de n8n
 

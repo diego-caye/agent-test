@@ -622,7 +622,7 @@ DoD: checklist de entrega completo. **Parar antes del merge `develop → main`.*
 
 - [x] README completo
 - [x] Diagrama Mermaid, antes/después
-- [ ] `docs/demo-script.md`
+- [x] `docs/demo-script.md`
 - [x] Sync specs ↔ código
 - [ ] PR `develop → main`
 - [ ] Tag `v1.0.0`
@@ -684,5 +684,44 @@ entrega en vez de dejarlo documentado como límite conocido:
 - [x] **Verificado contra el modelo real, no solo el doble de test:** "por
   ahora solo estoy mirando" con `gemma4:12b` llamó la tool, dijo la frase
   exacta, y `GET /lead` devolvió `solo_mirando: true`.
+
+### Repaso contra el PDF del reto y su rúbrica de evaluación
+
+A pedido del humano, antes de la parada obligatoria de `develop → main` se
+releyó el enunciado completo (rúbrica incluida) contra el estado real del
+código, no solo contra los specs. Dos ajustes:
+
+- [x] **README ganó una justificación del framework escrita directo, no solo
+  enlazada.** El enunciado pide "justificación técnica del framework
+  agéntico seleccionado" *en* el README — antes solo había un link a
+  `ADR-001-framework.md`. Se agregó un párrafo propio (§ "Por qué Google
+  ADK").
+- [x] **Diagrama nuevo: "Flujo de un turno"**, con memoria, las 3 tools, HITL
+  y guardrails como nodos explícitos — el enunciado pide el diagrama
+  "especificando memoria, tools, HITL y guardrails" y el diagrama de
+  componentes original no los etiquetaba como pasos de un flujo. Verificado
+  con `mermaid-cli` como los otros tres.
+- [x] **Feedback del usuario con UI real, no solo el endpoint.** La rúbrica
+  (20%, "Implementación del Harness") pide explícitamente "captura de
+  feedback del usuario" como resultado esperado — más fuerte que el "opcional"
+  del cuerpo del enunciado, que habla del feedback loop de *evaluación*, no
+  del de usuario. `MessageList` ganó botones 👍/👎 bajo la última respuesta
+  del agente (`onFeedback`, `api.sendFeedback` nuevo en `client.ts`,
+  `sendFeedback` en `useChat`). Verificado en el navegador contra el stack
+  real: la fila queda en `feedback` y el score llega a Langfuse — un primer
+  intento de verificación pareció fallar (la fila no aparecía) porque el
+  script de prueba cerraba el navegador antes de que la llamada a Langfuse
+  (awaited dentro del propio endpoint) terminara; no es un bug de la app.
+- [x] `.gitignore` ganó `*.pdf`: el enunciado del reto vivía sin trackear en
+  la raíz del repo — un `git add -A` lo habría comiteado, metiendo el nombre
+  de la empresa del proceso de selección al historial.
+
+Resto del enunciado, verificado sin cambios de código: persistencia SQL ✅,
+sesiones concurrentes sin fuga (AT-19) ✅, tipado estricto en ambos lados
+(mypy strict + TS strict) ✅, config vía variables de entorno ✅, rama por
+fase con merge commits ✅, specs cubriendo contratos de API/tools,
+transiciones de estado y AT/guardrails ✅.
+
+Frontend: typecheck, build y 22 tests de vitest limpios.
 
 Suite completa: 192 tests, mypy y ruff limpios.
