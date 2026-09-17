@@ -22,7 +22,7 @@ Python 3.12 + uv + FastAPI + Pydantic v2 + SQLAlchemy 2 async + Alembic + `googl
 
 ## Estado actual
 
-**F0–F6 completas y mergeadas a `develop`** (F8, modelos locales, se adelantó dentro de F6). Quedan **F7** (feedback y evaluaciones, P1) y **F9** (README, diagramas, guion de demo, tag `v1.0.0`, P0).
+**F0–F7 completas y mergeadas a `develop`** (F8, modelos locales, se adelantó dentro de F6). Queda **F9** (README, diagramas, guion de demo, tag `v1.0.0`, P0) — único bloqueante para la entrega.
 
 **Falta remoto en GitHub y `gh auth login`**, así que los merges de fase se hacen localmente con `git merge --no-ff` y el cuerpo del merge commit hace de descripción de PR — ver `specs/open-questions.md`.
 

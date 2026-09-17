@@ -276,7 +276,11 @@ async def build_container(
 
     sessions = session_service or DatabaseSessionService(db_url=settings.database_url)
     session_titles = SqlSessionTitleRepository(session_factory)
-    title_service = TitleService(build_title_model(settings, title_model), session_titles)
+    # Un solo modelo ligero para las dos tareas de utilidad que no son la
+    # conversación en sí (titular, resumir para compactar): construirlo dos
+    # veces sería dos instancias de LiteLlm/Gemini idénticas sin motivo.
+    utility_model = build_title_model(settings, title_model)
+    title_service = TitleService(utility_model, session_titles)
     feedback = SqlFeedbackRepository(session_factory)
     evaluation_service = EvaluationService(
         build_eval_model(settings, eval_model), SqlEvaluationRepository(session_factory), settings
@@ -299,7 +303,7 @@ async def build_container(
             knowledge_service,
             build_llm(settings, model, choice),
         )
-        return Runner(app=create_adk_app(settings, agent), session_service=sessions)
+        return Runner(app=create_adk_app(settings, agent, utility_model), session_service=sessions)
 
     return Container(
         settings=settings,

@@ -5,6 +5,7 @@ from google.adk.agents.readonly_context import ReadonlyContext
 from google.adk.apps import App
 from google.adk.apps._configs import ResumabilityConfig
 from google.adk.apps.app import EventsCompactionConfig
+from google.adk.apps.llm_event_summarizer import LlmEventSummarizer
 from google.adk.models.base_llm import BaseLlm
 from google.adk.plugins.base_plugin import BasePlugin
 
@@ -58,12 +59,22 @@ def create_plugins(settings: Settings) -> list[BasePlugin]:
     return plugins
 
 
-def create_adk_app(settings: Settings, agent: Agent) -> App:
+def create_adk_app(settings: Settings, agent: Agent, summarizer_model: BaseLlm) -> App:
     return App(
         name=APP_NAME,
         root_agent=agent,
         plugins=create_plugins(settings),
         events_compaction_config=EventsCompactionConfig(
+            # Sin `summarizer`, ADK usa por defecto el modelo del propio agente
+            # (agent.canonical_model) para resumir -- el modelo grande, en la
+            # misma llamada síncrona que cierra el turno (compaction.py,
+            # verificado leyendo la fuente). Se pasa aquí el modelo ligero
+            # (el mismo que titula conversaciones) a propósito: resumir no es
+            # tarea para el modelo principal, y con un modelo local ya al
+            # límite de tokens en turnos pesados (ADR-003 hallazgo #9), sumarle
+            # otra llamada al modelo grande justo cuando la conversación ya es
+            # larga sería el peor momento para hacerlo más lento.
+            summarizer=LlmEventSummarizer(llm=summarizer_model),
             token_threshold=settings.memory_compaction_token_threshold,
             event_retention_size=settings.memory_compaction_keep_recent,
         ),
