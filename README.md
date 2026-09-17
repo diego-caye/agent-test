@@ -207,11 +207,10 @@ docker compose up -d                                                # levanta to
 | Firmas de ADK verificadas contra el paquete instalado | [`specs/notes/adk-api.md`](specs/notes/adk-api.md) |
 | Checklist de fases y hallazgos de cada ronda | [`PROGRESS.md`](PROGRESS.md) |
 | Guion de pruebas manuales | [`docs/pruebas-manuales.md`](docs/pruebas-manuales.md) |
-| Guion de la demo grabada | [`docs/demo-script.md`](docs/demo-script.md) |
 
 ## Demo
 
-Video (5-7 min): _pendiente de grabar y enlazar — ver [`docs/demo-script.md`](docs/demo-script.md)._
+Video (5-7 min): _pendiente de grabar y enlazar._
 
 ## Estado del proyecto
 
