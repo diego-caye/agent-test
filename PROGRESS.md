@@ -841,3 +841,33 @@ sessions/events/leads/handoffs/feedback/evaluations/session_titles,
 Encontrado en el camino: truncar `adk_internal_metadata` a mano rompe
 el arranque del backend (ADK guarda ahí su `schema_version`); restaurado
 insertando `('schema_version', '1')`.
+
+### Repaso completo del guion de demo con Gemini, a pedido del humano
+
+Un bug real encontrado y arreglado (detalle arriba, "L4 no atrapaba una
+pseudo-tool-call en forma de JSON"): el modelo de respaldo escribió la
+tool como texto JSON crudo y se le coló al usuario en la burbuja del
+chat. Verificado con unit tests; no se pudo forzar en vivo de nuevo
+porque no es determinístico, pero el caso real quedó capturado como
+test.
+
+**Hallazgo externo, no de código:** la cuota gratuita de Gemini
+(`GenerateRequestsPerDayPerProjectPerModel-FreeTier`, 20 solicitudes/día
+por modelo) se agotó en medio de las pruebas de esta sesión. El sistema
+lo manejó bien -- 3 reintentos y caída al respaldo, tal como especifica
+la spec 07 -- pero cada turno con Gemini se volvió notablemente más
+lento después de agotarse. Resetea diario (probablemente medianoche
+hora Pacífico, ~2am hora Perú), así que debería estar libre para la
+grabación de mañana si no se le pega más hoy.
+
+**Nota sobre el propio proceso de verificación:** varios "bugs" que
+parecían reales durante esta ronda resultaron ser fallos del script de
+Playwright usado para probar (un `waitForSelector` con
+`state:'detached'` sobre un elemento nunca montado resuelve de
+inmediato; un chequeo de contenido que matcheaba la burbuja del propio
+usuario en vez de la respuesta del agente) -- verificado consultando la
+tabla `events` y `GET /sessions/{id}/messages` directamente en cada
+caso dudoso, en vez de confiar ciegamente en el resultado del script.
+Los dos bugs reales de este repaso (el cruce de proveedor del respaldo,
+y este de L4) sí se confirmaron con datos crudos de Postgres antes de
+tocar código.
