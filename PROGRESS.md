@@ -824,3 +824,20 @@ Verificado en el navegador contra el stack real con Gemini seleccionado
 (saludo+lead, RAG, HITL con ticket) vía Playwright: cero errores de
 consola. Suite completa: 196 tests de backend (3 nuevos), mypy y ruff
 limpios; typecheck, build y 24 tests de frontend limpios.
+
+### `GET /feedback` sin `admin_token`, a pedido del humano
+
+El proyecto no tiene auth de verdad en ningún otro lado (`X-User-Id` es
+un UUID que pone el propio cliente); quien evalúa el reto como máximo
+configura su `GOOGLE_API_KEY`. Pedirle además un `admin_token` solo
+para ver el panel de feedback era fricción sin ninguna seguridad real
+detrás. `/handoffs` se queda con el token (cambia estado real vía
+`PATCH`), pero listar feedback ya no lo necesita — el panel dev carga
+la sección "Feedback" sola al abrirse, sin ningún campo que llenar.
+
+Base de datos limpiada para grabar la demo (`TRUNCATE` de
+sessions/events/leads/handoffs/feedback/evaluations/session_titles,
+`kb_chunks` intacto — eso es contenido real, no dato de prueba).
+Encontrado en el camino: truncar `adk_internal_metadata` a mano rompe
+el arranque del backend (ADK guarda ahí su `schema_version`); restaurado
+insertando `('schema_version', '1')`.
