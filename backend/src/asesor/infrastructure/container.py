@@ -202,9 +202,15 @@ def build_fallback_model(settings: Settings, choice: ModelChoice) -> BaseLlm | N
     if settings.fallback_model == choice.model:
         return None
 
-    if choice.provider is LlmProviderName.OLLAMA:
-        # OLLAMA_THINK describe al modelo principal. El respaldo suele ser otro
-        # más pequeño y sin esa capacidad, así que nunca se le envía.
+    # El proveedor del respaldo lo dice el propio FALLBACK_MODEL (su prefijo
+    # ollama_chat/), no el proveedor del modelo principal de este choice: son
+    # independientes -- el catálogo mezcla opciones de Gemini y de Ollama
+    # (spec 11), y FALLBACK_MODEL es uno solo, global, usado como respaldo
+    # para cualquiera de ellas. Ramificar por choice.provider construía un
+    # Gemini(model="ollama_chat/...") cuando el principal elegido era Gemini
+    # y el respaldo configurado era de Ollama -- 404 real contra la API de
+    # Gemini, visto en vivo al seleccionar Gemini desde el selector.
+    if settings.fallback_model.startswith("ollama_chat/"):
         return LiteLlm(model=settings.fallback_model, **_ollama_kwargs(settings, think=False))
 
     return Gemini(model=settings.fallback_model)

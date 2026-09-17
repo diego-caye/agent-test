@@ -144,6 +144,33 @@ async def test_listar_feedback_requiere_token_admin(client: AsyncClient) -> None
     ).status_code == 401
 
 
+async def test_borrar_la_sesion_borra_tambien_su_feedback(
+    client: AsyncClient, user_id: UUID, session_factory: SessionFactory
+) -> None:
+    session_id = await new_session(client, user_id)
+    await client.post(
+        "/api/v1/feedback",
+        json={
+            "session_id": session_id,
+            "trace_id": "trace-a-borrar",
+            "score": 1,
+            "message": "este feedback debe desaparecer con la sesion",
+        },
+        headers={"X-User-Id": str(user_id)},
+    )
+
+    delete_response = await client.delete(
+        f"/api/v1/sessions/{session_id}", headers={"X-User-Id": str(user_id)}
+    )
+    assert delete_response.status_code == 204
+
+    async with session_factory() as db_session:
+        row = await db_session.scalar(
+            select(FeedbackRow).where(FeedbackRow.session_id == session_id)
+        )
+    assert row is None
+
+
 async def test_listar_feedback_devuelve_lo_mas_reciente_primero_con_mensaje(
     client: AsyncClient, user_id: UUID
 ) -> None:

@@ -76,9 +76,12 @@ export function MessageList({
         ))}
 
         {activity
+          .map((item, index) => ({ ...item, index }))
           .filter((item) => !item.done)
           .map((item) => (
-            <ActivityChip key={item.name} name={item.name} />
+            // El mismo tool puede llamarse más de una vez en el turno (p. ej.
+            // guardar_lead dos veces): el nombre solo no es una key única.
+            <ActivityChip key={`${item.name}-${item.index}`} name={item.name} />
           ))}
 
         {pendingReply && <TypingIndicator isLocalModel={isLocalModel} />}
