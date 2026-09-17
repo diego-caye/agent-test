@@ -6,8 +6,6 @@ from sqlalchemy import select
 from asesor.infrastructure.db.engine import SessionFactory
 from asesor.infrastructure.db.models import FeedbackRow
 
-ADMIN = {"Authorization": "Bearer test-admin-token"}
-
 
 async def new_session(client: AsyncClient, user_id: UUID) -> str:
     response = await client.post("/api/v1/sessions", headers={"X-User-Id": str(user_id)})
@@ -137,13 +135,6 @@ async def test_feedback_requiere_x_user_id(client: AsyncClient) -> None:
     assert response.status_code == 401
 
 
-async def test_listar_feedback_requiere_token_admin(client: AsyncClient) -> None:
-    assert (await client.get("/api/v1/feedback")).status_code == 401
-    assert (
-        await client.get("/api/v1/feedback", headers={"Authorization": "Bearer nope"})
-    ).status_code == 401
-
-
 async def test_borrar_la_sesion_borra_tambien_su_feedback(
     client: AsyncClient, user_id: UUID, session_factory: SessionFactory
 ) -> None:
@@ -196,7 +187,8 @@ async def test_listar_feedback_devuelve_lo_mas_reciente_primero_con_mensaje(
         headers={"X-User-Id": str(user_id)},
     )
 
-    response = await client.get("/api/v1/feedback", headers=ADMIN)
+    # Sin ningún header especial: listar feedback no requiere token (spec 02).
+    response = await client.get("/api/v1/feedback")
 
     assert response.status_code == 200
     entries = response.json()
