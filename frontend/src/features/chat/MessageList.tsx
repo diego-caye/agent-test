@@ -5,7 +5,8 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 
-import type { Activity, Message } from './reducer'
+import { DeclinedNotice, HandoffNotice } from '../hitl/ConfirmationCard'
+import type { Activity, DeclinedConfirmation, Handoff, Message } from './reducer'
 import { TOOL_ACTIVITY } from './labels'
 
 type Props = {
@@ -24,6 +25,11 @@ type Props = {
   // trace adjuntarle el score en Langfuse, así que no se ofrece feedback.
   traceId: string | null
   onFeedback: (traceId: string, score: 1 | -1, message: string) => void
+  // El eco de una derivación (aceptada o declinada) va debajo del mensaje del
+  // agente que la disparó, no suelto junto al composer: a pedido del humano,
+  // para que se lea como parte de esa respuesta y no como una barra aparte.
+  handoff: Handoff | null
+  declinedConfirmation: DeclinedConfirmation | null
 }
 
 export function MessageList({
@@ -36,6 +42,8 @@ export function MessageList({
   isLocalModel,
   traceId,
   onFeedback,
+  handoff,
+  declinedConfirmation,
 }: Props) {
   const endRef = useRef<HTMLDivElement>(null)
   const lastMessage = messages.at(-1)
@@ -56,24 +64,35 @@ export function MessageList({
       aria-label="Conversación"
     >
       <div className="mx-auto flex max-w-2xl flex-col gap-3">
-        {messages.map((message) => (
-          <Bubble
-            key={message.id}
-            message={message}
-            // Solo el último mensaje puede necesitar reintento: es el único
-            // que se quedó sin respuesta. Uno de en medio ya la tiene.
-            showRetry={retryable && message.id === lastMessage?.id}
-            retryDisabled={streaming}
-            onRetry={onRetry}
-            onEdit={onEdit}
-            // Mismo criterio de "es el último": solo la respuesta más reciente
-            // tiene sentido calificar, no una de en medio de la conversación.
-            showFeedback={
-              !streaming && message.role === 'agent' && message.id === lastMessage?.id && Boolean(traceId)
-            }
-            onFeedback={(score) => traceId && onFeedback(traceId, score, message.content)}
-          />
-        ))}
+        {messages.map((message) => {
+          const isLastMessage = message.id === lastMessage?.id
+          const isLastAgentMessage = message.role === 'agent' && isLastMessage
+          return (
+            <div key={message.id} className="flex flex-col gap-1.5">
+              <Bubble
+                message={message}
+                // Solo el último mensaje puede necesitar reintento: es el único
+                // que se quedó sin respuesta. Uno de en medio ya la tiene.
+                showRetry={retryable && isLastMessage}
+                retryDisabled={streaming}
+                onRetry={onRetry}
+                onEdit={onEdit}
+                // Mismo criterio de "es el último": solo la respuesta más reciente
+                // tiene sentido calificar, no una de en medio de la conversación.
+                showFeedback={!streaming && isLastAgentMessage && Boolean(traceId)}
+                onFeedback={(score) => traceId && onFeedback(traceId, score, message.content)}
+              />
+              {/* Va debajo del último mensaje sea cual sea su rol, no solo el
+                  del agente: a veces el modelo llama la tool de derivación
+                  sin texto previo, así que el último mensaje en pantalla en
+                  ese momento sigue siendo el del propio usuario. */}
+              {isLastMessage && handoff && <HandoffNotice handoff={handoff} />}
+              {isLastMessage && declinedConfirmation && (
+                <DeclinedNotice declined={declinedConfirmation} />
+              )}
+            </div>
+          )
+        })}
 
         {activity
           .map((item, index) => ({ ...item, index }))

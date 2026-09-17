@@ -11,7 +11,7 @@ import { MessageList } from './features/chat/MessageList'
 import { ModelSelect } from './features/chat/ModelSelect'
 import { useChat } from './features/chat/useChat'
 import { DevPanel } from './features/devpanel/DevPanel'
-import { ConfirmationCard, DeclinedNotice, HandoffNotice } from './features/hitl/ConfirmationCard'
+import { ConfirmationCard } from './features/hitl/ConfirmationCard'
 import { Sidebar } from './features/sessions/Sidebar'
 
 const DEV_PANEL_KEY = 'asesor.devpanel'
@@ -101,6 +101,8 @@ export default function App() {
           isLocalModel={models.find((model) => model.id === modelId)?.provider === 'ollama'}
           traceId={state.metrics?.trace_id ?? null}
           onFeedback={(traceId, score, message) => void sendFeedback(traceId, score, message)}
+          handoff={state.handoff}
+          declinedConfirmation={state.declinedConfirmation}
         />
 
         <div className="flex flex-col gap-3 border-t px-4 py-4 sm:px-8">
@@ -112,8 +114,8 @@ export default function App() {
             />
           )}
 
-          {state.handoff && <HandoffNotice handoff={state.handoff} />}
-          {state.declinedConfirmation && <DeclinedNotice declined={state.declinedConfirmation} />}
+          {/* El eco de la derivación (aceptada o declinada) vive junto al
+              mensaje del agente que la disparó (MessageList), no aquí. */}
 
           {/* El botón de reintentar vive junto al mensaje que se reenvía
               (MessageList), no aquí: uno solo al pie de la pantalla no
