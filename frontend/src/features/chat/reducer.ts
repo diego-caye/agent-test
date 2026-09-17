@@ -1,10 +1,30 @@
 import type { Etapa, LeadDto, ServerEvent, TurnMetrics } from '../../api/types'
 
+export type Handoff = { ticket: string; ya_existia: boolean }
+
+// Eco de la tarjeta de confirmación, aceptada o declinada: a diferencia de
+// aprobar (donde handoff.created cuenta la historia con el ticket), cancelar
+// no crea nada del lado del backend, así que sin esto no queda ningún rastro
+// de qué se preguntó ni qué se contestó.
+export type DeclinedConfirmation = { motivo: string }
+
+// Va DENTRO del mensaje al que pertenece (el que disparó la derivación), no
+// en un campo aparte del estado global: un campo aparte se limpiaba con
+// cada mensaje nuevo del usuario (para no arrastrar el eco de un tema viejo
+// al turno siguiente) pero eso también borraba el eco para siempre en
+// cuanto se seguía conversando, aunque la fila siguiera ahí en la propia
+// burbuja — reportado en vivo. Colgado del mensaje, sobrevive solo porque
+// el mensaje mismo nunca se borra.
+export type MessageDecision =
+  | ({ kind: 'handoff' } & Handoff)
+  | ({ kind: 'declined' } & DeclinedConfirmation)
+
 export type Message = {
   id: string
   role: 'user' | 'agent'
   content: string
   streaming: boolean
+  decision?: MessageDecision
 }
 
 export type Activity = { name: string; done: boolean }
@@ -16,20 +36,10 @@ export type Confirmation = {
   canal_preferido: string | null
 }
 
-export type Handoff = { ticket: string; ya_existia: boolean }
-
-// Eco de la tarjeta de confirmación una vez que el usuario dijo "Ahora no":
-// a diferencia de aprobar (donde handoff.created ya cuenta la historia con
-// el ticket), cancelar no crea nada, así que sin esto no queda ningún
-// rastro de qué se preguntó ni qué se contestó.
-export type DeclinedConfirmation = { motivo: string }
-
 export type ChatState = {
   messages: Message[]
   activity: Activity[]
   pendingConfirmation: Confirmation | null
-  handoff: Handoff | null
-  declinedConfirmation: DeclinedConfirmation | null
   lead: LeadDto | null
   etapa: Etapa
   metrics: TurnMetrics | null
@@ -42,8 +52,6 @@ export const initialChatState: ChatState = {
   messages: [],
   activity: [],
   pendingConfirmation: null,
-  handoff: null,
-  declinedConfirmation: null,
   lead: null,
   etapa: 'NUEVO',
   metrics: null,
@@ -107,8 +115,6 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
       return {
         ...state,
         error: null,
-        handoff: null,
-        declinedConfirmation: null,
         lastUserMessage: action.content,
         messages: [
           ...state.messages,
@@ -146,13 +152,13 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
     case 'server':
       return applyServerEvent(state, action.event)
 
-    case 'confirmation-declined':
-      return {
-        ...clearConfirmation(state),
-        declinedConfirmation: state.pendingConfirmation
-          ? { motivo: state.pendingConfirmation.motivo }
-          : state.declinedConfirmation,
-      }
+    case 'confirmation-declined': {
+      const motivo = state.pendingConfirmation?.motivo
+      const cleared = clearConfirmation(state)
+      return motivo
+        ? { ...cleared, messages: attachDecision(cleared.messages, { kind: 'declined', motivo }) }
+        : cleared
+    }
   }
 }
 
@@ -211,7 +217,11 @@ function applyServerEvent(state: ChatState, event: ServerEvent): ChatState {
       return {
         ...state,
         pendingConfirmation: null,
-        handoff: { ticket: event.ticket, ya_existia: event.ya_existia },
+        messages: attachDecision(state.messages, {
+          kind: 'handoff',
+          ticket: event.ticket,
+          ya_existia: event.ya_existia,
+        }),
       }
 
     case 'guardrail.triggered':
@@ -242,4 +252,15 @@ function appendDelta(messages: Message[], delta: string): Message[] {
 
 export function clearConfirmation(state: ChatState): ChatState {
   return { ...state, pendingConfirmation: null }
+}
+
+// El mensaje al que se cuelga la decisión es el último de la conversación en
+// ese momento, sea del agente o del usuario: a veces el modelo llama la tool
+// de derivación sin texto previo, así que el último mensaje en pantalla
+// puede ser el del propio usuario.
+function attachDecision(messages: Message[], decision: MessageDecision): Message[] {
+  if (messages.length === 0) return messages
+  return messages.map((message, index) =>
+    index === messages.length - 1 ? { ...message, decision } : message,
+  )
 }
