@@ -7,7 +7,7 @@
 | Adaptador | Uso | Selección |
 |---|---|---|
 | Gemini | Default | AI Studio o Vertex AI, según `GOOGLE_GENAI_USE_VERTEXAI` |
-| Ollama / Gemma 4 | Local (P2, spec 13) | Vía LiteLLM, `LLM_PROVIDER=ollama` |
+| Ollama / Gemma 4 | Local (P2, spec 10) | Vía LiteLLM, `LLM_PROVIDER=ollama` |
 
 Ningún modelo se hardcodea: `AGENT_MODEL`, `GUARDRAIL_MODEL`, `EVAL_MODEL`, `FALLBACK_MODEL` son variables de entorno obligatorias (falla al arrancar si faltan y el provider correspondiente está activo). Los IDs de modelo Gemini cambian con frecuencia — se verifican contra la documentación oficial vigente antes de fijarlos en `.env.example`, nunca se asumen de memoria (gotcha #6, prompt maestro).
 

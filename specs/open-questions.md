@@ -37,6 +37,11 @@ Detectado al arrancar F0 (2026-09-15) y actualizado al cerrar F1.
 - Si el SDK de ADK 2.x expone un nivel de "thinking" configurable por env para el modelo del agente (spec 05 §3). No se investigó en F2: no bloquea, es una optimización de latencia.
 - `App(name=...)` debe coincidir con el directorio del agente para que `adk eval` encuentre las sesiones. Nuestra estructura no sigue la convención de directorios de ADK; revisar al montar el evalset en F7.
 
+## Encontrado en la sincronización spec↔código de F9
+
+- **`solo_mirando` nunca se activaba — resuelto.** El flag existía de punta a punta (frase canned, inyectado en la instrucción) pero ningún código lo escribía. El humano eligió cerrarlo antes de la entrega: `guardar_lead` ganó un campo opcional `solo_mirando: bool` que escribe `SOLO_MIRANDO_KEY` en el estado de sesión (igual patrón que ya usaba para la etapa), con AT-05 real (`test_at_agent_core.py`) y verificado en vivo contra el modelo real.
+- **`GUARDRAIL_MODEL` no guarda relación con ningún guardrail.** El nombre sugiere el clasificador L2 (nunca implementado, sigue P1), pero en el código real ese modelo lo usan `TitleService` y el resumidor de `EventsCompactionConfig` (spec 06 §2) — el nombre de la variable quedó desalineado de su uso real. No se renombró en F9 por el costo de tocar `config.py`/`.env.example`/`docker-compose.yml`/tests a días de la entrega; documentado en spec 07 §5 y aquí para quien retome esto.
+
 ## Otras decisiones abiertas, no bloqueantes
 
 - Formato exacto de `ADMIN_TOKEN` (bearer estático simple vs. algo más elaborado) — se define en F3 junto con los endpoints admin; un bearer estático por env basta para el alcance del reto.

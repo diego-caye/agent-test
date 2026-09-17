@@ -30,17 +30,21 @@
 
 - **Regla de dependencia:** `api → application → domain ← infrastructure`. `domain` no importa ADK, FastAPI ni SQLAlchemy — son `Protocol`s y entidades puras, testeables sin red ni DB.
 - **`agent/`** depende de `application` (llama a los mismos servicios que usa `api/`), nunca al revés: las tools son adaptadores delgados que traducen argumentos del LLM a llamadas de servicio y el resultado a un envelope (spec 03).
-- **`application/`** orquesta casos de uso (`ChatService`, `LeadService`, `HandoffService`, `KnowledgeService`, `FeedbackService`, `EvalService`) contra los puertos definidos en `domain/`.
+- **`application/`** orquesta casos de uso (`ChatService`, `LeadService`, `HandoffService`, `KnowledgeService`, `TitleService`, `EvaluationService`) contra los puertos definidos en `domain/` o, para los repositorios más simples, directamente contra su implementación SQL concreta.
 - **`infrastructure/`** implementa esos puertos: repositorios SQLAlchemy, retriever pgvector, adaptadores de embeddings y LLM, telemetría, fault injection.
 
-## 3. Puertos clave (Protocols en `domain/`)
+## 3. Puertos clave
 
-| Puerto | Implementaciones | Usado por |
-|---|---|---|
-| `LlmProvider` | Gemini (AI Studio/Vertex), Ollama vía LiteLLM | `agent/` factory del `Agent` |
-| `Embeddings` | Gemini (`gemini-embedding-001`/`-2`), Ollama (`embeddinggemma`) | `KnowledgeService`, `scripts/ingest_kb.py` |
-| `LeadRepository`, `HandoffRepository`, `FeedbackRepository`, `EvaluationRepository`, `KbChunkRepository` | SQLAlchemy async sobre Postgres | `application/*Service` |
-| `KnowledgeRetriever` | pgvector HNSW coseno | `KnowledgeService` |
+El `Protocol` no está centralizado en `domain/ports.py` para todo: vive ahí para `LeadRepository` (el primero, F2) y junto al servicio que lo usa para `HandoffRepository` (`application/handoff_service.py`) — desacoplar pagó su costo en ambos porque los tests los reemplazan por dobles en memoria desde el día uno. Los repositorios que se sumaron después (`session_titles`, `feedback`, `evaluations`) se inyectan por su clase SQL concreta directamente, sin `Protocol` intermedio: solo hay una implementación real y añadir la interfaz no cambiaría cómo se testean (ya usan una clase "fake" con el mismo contrato duck-typed, spec 09).
+
+| Puerto | Dónde vive el `Protocol` | Implementaciones | Usado por |
+|---|---|---|---|
+| `LlmProvider` | (firma de ADK, no propio) | Gemini (AI Studio/Vertex), Ollama vía LiteLLM | `agent/` factory del `Agent`, `TitleService`, `EvaluationService`, resumidor de compactación (spec 06 §2) |
+| `EmbeddingsPort` | `domain/knowledge.py` | Gemini (`gemini-embedding-001`/`-2`), Ollama (`embeddinggemma`) | `KnowledgeService`, `scripts/ingest_kb.py` |
+| `LeadRepository` | `domain/ports.py` | `SqlLeadRepository` | `LeadService` |
+| `HandoffRepository` | `application/handoff_service.py` | `SqlHandoffRepository` | `HandoffService` |
+| `SqlSessionTitleRepository`, `SqlFeedbackRepository`, `SqlEvaluationRepository` | sin `Protocol`, clase concreta | (ellas mismas) | `TitleService`, router de feedback, `EvaluationService` |
+| `KnowledgeRetriever` | `domain/knowledge.py` | pgvector HNSW coseno (`PgVectorRetriever`) | `KnowledgeService` |
 
 `Settings` (`config.py`) valida combinaciones inválidas de provider al arrancar (p. ej. `EMBEDDINGS_PROVIDER=ollama` con `LLM_PROVIDER` en modo que no lo soporte) y falla rápido con un mensaje claro.
 

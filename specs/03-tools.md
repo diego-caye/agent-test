@@ -25,8 +25,9 @@ Upsert parcial de la ficha del lead del `user_id` actual (no de la sesión: el l
 | `tipo_vehiculo_interes` | `enum?` | `SUV \| SEDAN \| HATCHBACK \| PICKUP \| VAN \| CROSSOVER \| OTRO` |
 | `motorizacion_interes` | `enum?` | `GASOLINA \| DIESEL \| HIBRIDO \| ELECTRICO \| GLP_GNV \| NO_DEFINIDO` |
 | `nivel_interes` | `enum?` | `BAJO \| MEDIO \| ALTO`, lo infiere el LLM de señales conversacionales |
+| `solo_mirando` | `bool?` | `true` la primera vez que el usuario dice que solo está mirando/comparando (spec 04). No es un dato del lead: no se persiste en `leads`, se escribe en el estado de sesión (dialog state). Puede ir solo, sin ningún otro campo |
 
-Todos los campos son opcionales (upsert parcial: solo se actualiza lo que llega). Al menos un campo debe estar presente, si no → `error.code=EMPTY_UPDATE`.
+Todos los campos son opcionales (upsert parcial: solo se actualiza lo que llega). Al menos un campo debe estar presente, si no → `error.code=EMPTY_UPDATE` — `solo_mirando=true` por sí solo cuenta como presente, no dispara ese error.
 
 **Comportamiento:** persiste vía `LeadService.upsert(user_id, ...)`; la **etapa se recalcula en el dominio** (máquina de estados, spec 04) a partir del lead resultante — el LLM nunca la asigna directamente. Devuelve `{status: "ok", data: {lead: {...}, etapa: str}}` y el backend emite SSE `lead.updated`.
 
@@ -58,7 +59,7 @@ Equivalente al nodo `base_conocimientos_autos` del baseline, ahora con umbral y 
 | `categoria` | `enum?` | `CARROCERIAS \| SEGMENTOS \| MOTORIZACION \| TRANSMISION \| CONSUMO \| MANTENIMIENTO \| SEGURIDAD \| USO \| GLOSARIO` |
 | `top_k` | `int` | 1–8, default 4 |
 
-**Comportamiento:** embebe `query` con el `Embeddings` configurado, busca por coseno en `kb_chunks` (filtrando por `categoria` si viene), ordena por score. Si el mejor score < `RAG_MIN_SCORE` (env) → `status: "no_results"`, `data: null` — el agente usa la frase honesta del baseline (spec 05, 07). Si hay resultados: `data: [{"chunk_id", "title", "categoria", "source", "score", "content"}]`, longitud `top_k`.
+**Comportamiento:** embebe `query` con el `Embeddings` configurado, busca por coseno en `kb_chunks` (filtrando por `categoria` si viene), ordena por score. Si el mejor score < `RAG_MIN_SCORE` (env) → `status: "no_results"`, `data: null` — el agente usa la frase honesta del baseline (spec 05, 07). Si hay resultados: `data: {"resultados": [{"chunk_id", "title", "categoria", "source", "score", "content"}]}`, longitud `top_k`.
 
 ## 5. Guardrails de tools (L3, ver spec 07)
 

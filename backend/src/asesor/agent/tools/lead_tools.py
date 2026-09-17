@@ -5,7 +5,7 @@ from uuid import UUID
 from google.adk.tools import ToolContext
 from pydantic import BaseModel, ValidationError
 
-from asesor.agent.state import STAGE_KEY, read_dialog_state
+from asesor.agent.state import SOLO_MIRANDO_KEY, STAGE_KEY, read_dialog_state
 from asesor.agent.tools.envelope import error, ok
 from asesor.application.lead_service import LeadService
 from asesor.domain.entities import LeadUpdate
@@ -31,9 +31,10 @@ class _GuardarLeadArgs(BaseModel):
     tipo_vehiculo_interes: TipoVehiculo | None = None
     motorizacion_interes: Motorizacion | None = None
     nivel_interes: NivelInteres | None = None
+    solo_mirando: bool | None = None
 
     def to_update(self) -> LeadUpdate:
-        return LeadUpdate(**self.model_dump())
+        return LeadUpdate(**self.model_dump(exclude={"solo_mirando"}))
 
 
 def make_guardar_lead(lead_service: LeadService) -> GuardarLead:
@@ -48,6 +49,7 @@ def make_guardar_lead(lead_service: LeadService) -> GuardarLead:
         tipo_vehiculo_interes: str | None = None,
         motorizacion_interes: str | None = None,
         nivel_interes: str | None = None,
+        solo_mirando: bool | None = None,
     ) -> dict[str, Any]:
         """Guarda o actualiza la ficha del usuario con los datos que vaya compartiendo.
 
@@ -68,6 +70,10 @@ def make_guardar_lead(lead_service: LeadService) -> GuardarLead:
             motorizacion_interes: Uno de GASOLINA, DIESEL, HIBRIDO, ELECTRICO,
                 GLP_GNV, NO_DEFINIDO.
             nivel_interes: Uno de BAJO, MEDIO, ALTO, deducido de la conversación.
+            solo_mirando: true la primera vez que el usuario diga que solo está
+                mirando/comparando, sin intención de avanzar todavía. Puede ir solo,
+                sin ningún otro campo. Una vez activado, sigue así el resto de la
+                conversación: no hace falta volver a mandarlo.
 
         Returns:
             La ficha actualizada y la etapa del diálogo.
@@ -83,20 +89,31 @@ def make_guardar_lead(lead_service: LeadService) -> GuardarLead:
                 tipo_vehiculo_interes=tipo_vehiculo_interes,
                 motorizacion_interes=motorizacion_interes,
                 nivel_interes=nivel_interes,
+                solo_mirando=solo_mirando,
             )
         except ValidationError as exc:
             return error("VALIDATION_ERROR", _first_message(exc))
 
+        if args.solo_mirando:
+            # Vive en el estado de sesion (dialog state), no en la ficha del
+            # usuario: es una intencion de esta conversacion, no un dato del lead.
+            tool_context.state[SOLO_MIRANDO_KEY] = True
+
         dialog = read_dialog_state(tool_context.state)
+        update = args.to_update()
 
-        try:
-            snapshot = await lead_service.apply_update(
-                UUID(tool_context.user_id), args.to_update(), dialog.stage
-            )
-        except DomainError as exc:
-            return error(exc.code, exc.message, retryable=exc.retryable)
-
-        tool_context.state[STAGE_KEY] = snapshot.stage.value
+        if args.solo_mirando and update.is_empty():
+            # Se llamo solo para activar "solo mirando", sin ningun dato nuevo del
+            # lead -- valido, no debe caer en EMPTY_UPDATE.
+            snapshot = await lead_service.get_snapshot(UUID(tool_context.user_id), dialog.stage)
+        else:
+            try:
+                snapshot = await lead_service.apply_update(
+                    UUID(tool_context.user_id), update, dialog.stage
+                )
+            except DomainError as exc:
+                return error(exc.code, exc.message, retryable=exc.retryable)
+            tool_context.state[STAGE_KEY] = snapshot.stage.value
 
         return ok(
             {

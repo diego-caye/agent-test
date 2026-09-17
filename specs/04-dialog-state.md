@@ -35,11 +35,11 @@ Solo avanza, salvo la cancelación de `DERIVACION_PENDIENTE`, que vuelve a la et
 
 ## 3. Banderas auxiliares
 
-- `solo_mirando: bool` — se activa cuando el usuario dice la frase equivalente a "solo estoy mirando" (spec 05, 07 L1 no aplica aquí; es intención, no inyección). Mientras esté activa, el agente reduce preguntas proactivas pero las transiciones de etapa siguen funcionando igual si el usuario decide avanzar.
+- `solo_mirando: bool` — se activa cuando el usuario dice la frase equivalente a "solo estoy mirando" (spec 05, 07 L1 no aplica aquí; es intención, no inyección). Mientras esté activa, el agente reduce preguntas proactivas pero las transiciones de etapa siguen funcionando igual si el usuario decide avanzar. Se activa vía `guardar_lead(solo_mirando=true)` — puede ir solo, sin ningún otro campo, y no cuenta como `EMPTY_UPDATE` (spec 03 §2) — que escribe `SOLO_MIRANDO_KEY` en el estado de sesión (`agent/state.py`), igual que `guardar_lead` ya escribía la etapa. Verificado en vivo contra el modelo real (F9): el mensaje "por ahora solo estoy mirando" dispara la tool, la frase canned y `GET /sessions/{id}/lead` refleja `solo_mirando: true`. AT-05 (spec 09) tiene test propio (`test_at_agent_core.py`).
 - `handoff_abierto: bool` (derivada de `handoffs.status = OPEN` para la sesión) — si ya es `true` y el agente detecta un nuevo motivo de derivación, `solicitar_contacto_humano` es idempotente (spec 03 §3) y la etapa permanece en `DERIVADO`, no hay segunda `DERIVACION_PENDIENTE`.
 
 ## 4. Notas de implementación
 
-- La máquina de estados vive en `domain/` como función pura `next_stage(current, lead, event) -> Stage`, sin dependencias externas — testeable con `FakeLlm` ausente por completo (no necesita LLM).
+- La máquina de estados vive en `domain/` como función pura `next_stage(current: Stage, lead: Lead) -> Stage` (`domain/stages.py`), sin dependencias externas — testeable con `FakeLlm` ausente por completo (no necesita LLM). No recibe un `event` explícito: la etapa siguiente se deriva del propio `Lead` resultante.
 - El `Agent` ADK nunca escribe la etapa; solo la lee (inyectada en la instrucción, spec 05) y la observa en el resultado de las tools.
 - Confirmación de `DERIVACION_PENDIENTE`: ver spec 03 §3 y ADR-002 para el mecanismo primario (confirmación nativa de tools ADK) y el fallback (`pending_confirmation` en estado + confirmación por UI).

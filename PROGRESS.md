@@ -620,10 +620,69 @@ cancelar) que el evalset automático no cubre.
 
 DoD: checklist de entrega completo. **Parar antes del merge `develop → main`.**
 
-- [ ] README completo
-- [ ] Diagrama Mermaid, antes/después
+- [x] README completo
+- [x] Diagrama Mermaid, antes/después
 - [ ] `docs/demo-script.md`
-- [ ] Sync specs ↔ código
+- [x] Sync specs ↔ código
 - [ ] PR `develop → main`
 - [ ] Tag `v1.0.0`
 - [ ] Video 5–7 min
+
+### README y diagramas
+
+`README.md` en la raíz (antes no existía ninguno): características, arquitectura
+(diagrama Mermaid verificado con `@mermaid-js/mermaid-cli` antes de comitear —
+un intento inicial con comillas escapadas dentro de una etiqueta no renderizaba,
+corregido y re-verificado), comparación antes/después contra el baseline n8n
+(dos diagramas + tabla de brechas cerradas, spec 00), quick start con Docker
+(el camino sin API key como principal), estructura del proyecto, comandos,
+tests y evaluación, e índice de documentación.
+
+### Sync specs ↔ código: 7 desajustes reales encontrados, 6 arreglados directo, 1 resuelto con el humano
+
+Auditoría dedicada (agente de exploración, no una relectura superficial) de
+specs/03, 04, 05, 07, 10, 11 contra el código real. specs/01, 02, 06, 08, 09 ya
+se habían mantenido al día durante las rondas de F6/F7 de esta sesión, así que
+no se re-auditaron.
+
+**Arreglados directo en la spec (sin tocar código, cero riesgo):**
+- `search_knowledge_base`: la spec 03 decía `data` como array directo; el
+  código envuelve en `{"resultados": [...]}`.
+- `next_stage`: la spec 04 documentaba una firma `(current, lead, event)`; la
+  real es `(current, lead)` — la etapa siguiente sale del propio `Lead`
+  resultante, sin un `event` aparte.
+- HITL: la spec 05 decía "pide confirmación explícita al usuario antes de
+  ejecutar" — lo contrario de lo que hace el código (llama de inmediato, la
+  tool nativa de ADK maneja la confirmación, ADR-002). La instrucción real ya
+  lo dice bien; la spec se había quedado desactualizada.
+- Nombres de placeholders de la instrucción: la spec 05 decía `{lead_json}`/
+  `{canary_token}`; el código real usa `{ficha}`/`{canary}`.
+- L2 (clasificador): la spec 07 lo listaba como capa activa. Sigue sin
+  implementarse (P1) — esto ya lo decía `PROGRESS.md` desde F6, la spec 07
+  nunca se había actualizado para reflejarlo. De paso, categorías
+  `off_topic`/`abuse` (dependen de L2) marcadas como no emitidas todavía, y
+  `GUARDRAIL_MODEL` aclarado como reutilizado por `TitleService`/compactación,
+  no por ningún guardrail real.
+- Spec 11: referencia colgante a un inexistente "spec 13" (era spec 10).
+
+**Resuelto con el humano, no solo documentado:** `solo_mirando` (el modo
+"solo estoy mirando" del baseline) nunca se activaba — la frase canned y la
+lectura del flag existían, pero ningún código lo escribía (a diferencia de la
+etapa, que sí se escribe desde `guardar_lead`). AT-05 tampoco tenía test
+propio, así que nada lo había detectado. El humano pidió cerrarlo antes de la
+entrega en vez de dejarlo documentado como límite conocido:
+
+- [x] `guardar_lead` gana un campo opcional `solo_mirando: bool`, que puede ir
+  solo (sin ningún otro campo, sin disparar `EMPTY_UPDATE`) y escribe
+  `SOLO_MIRANDO_KEY` en el estado de sesión — mismo patrón que ya usaba la
+  etapa.
+- [x] Instrucción actualizada: el agente ahora sabe que debe llamar a
+  `guardar_lead(solo_mirando=true)`, no solo decir la frase canned.
+- [x] AT-05 real (`test_at_agent_core.py`) — tool call, frase exacta,
+  `GET /sessions/{id}/lead` refleja `solo_mirando: true`, y el flag sigue
+  activo (visible en la instrucción) en el turno siguiente.
+- [x] **Verificado contra el modelo real, no solo el doble de test:** "por
+  ahora solo estoy mirando" con `gemma4:12b` llamó la tool, dijo la frase
+  exacta, y `GET /lead` devolvió `solo_mirando: true`.
+
+Suite completa: 192 tests, mypy y ruff limpios.
