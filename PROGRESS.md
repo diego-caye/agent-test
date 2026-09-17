@@ -895,3 +895,22 @@ instrucción nunca decía qué hacer con un `cancelado=true`.
 
 Suite completa: 196 tests de backend, mypy y ruff limpios; typecheck,
 build y 24 tests de frontend limpios.
+
+### Reportado en vivo: a veces el primer mensaje "no se iba" desde el borrador
+
+Screenshot del humano: mensaje enviado desde `/` (borrador), la pantalla
+seguía viéndose vacía un momento, y la conversación terminaba en "se
+quedó sin respuesta, puedes reintentar". Diagnóstico con los eventos
+crudos (un solo evento de usuario, sin ninguna respuesta, ni siquiera
+`end_of_agent`) y los logs del backend (`Root node was cancelled`
+justo cuando el cliente recargó): `send()` esperaba a que terminara
+`POST /sessions` (un round-trip de red real) antes de mostrar la
+burbuja del usuario o deshabilitar "Enviar" — durante esa ventana la
+pantalla se veía igual al borrador vacío, y recargar pensando que no
+había registrado cortaba el turno a medias.
+
+- [x] `send()` despacha `user-sent`/`turn-start` ANTES de esperar a
+  `createSession()`: la burbuja y el botón deshabilitado aparecen de
+  inmediato (~70ms, verificado), sin importar cuánto tarde crear la
+  sesión. Si `createSession()` falla, despacha `turn-failed` en vez de
+  dejar la promesa sin manejar.
