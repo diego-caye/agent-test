@@ -36,6 +36,3 @@ skills-lock.json
 # confidencialidad, CLAUDE.md §5). Nunca debe entrar al historial.
 *.pdf
 
-# A pedido del humano: vive en el chat de trabajo, no en el repo.
-docs/demo-script.md
-
