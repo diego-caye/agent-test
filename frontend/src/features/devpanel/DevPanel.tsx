@@ -16,6 +16,9 @@ type Props = {
   metrics: TurnMetrics | null
   onClose: () => void
   onOpenSession: (sessionId: string) => void
+  // Se incrementa cada vez que se manda feedback con éxito, en cualquier
+  // parte de la app: dispara la recarga de la lista sin que haga falta F5.
+  feedbackVersion: number
 }
 
 const LANGFUSE_PROJECT = import.meta.env['VITE_LANGFUSE_PROJECT_ID'] as string | undefined
@@ -25,7 +28,7 @@ const LANGFUSE_PROJECT = import.meta.env['VITE_LANGFUSE_PROJECT_ID'] as string |
 const LANGFUSE_HOST =
   (import.meta.env['VITE_LANGFUSE_HOST'] as string | undefined) || 'https://cloud.langfuse.com'
 
-export function DevPanel({ lead, etapa, metrics, onClose, onOpenSession }: Props) {
+export function DevPanel({ lead, etapa, metrics, onClose, onOpenSession, feedbackVersion }: Props) {
   const record = (lead ?? {}) as Record<string, unknown>
 
   return (
@@ -99,7 +102,7 @@ export function DevPanel({ lead, etapa, metrics, onClose, onOpenSession }: Props
 
         <Separator />
 
-        <FeedbackSection onOpenSession={onOpenSession} />
+        <FeedbackSection onOpenSession={onOpenSession} refreshKey={feedbackVersion} />
       </SidebarContent>
     </Sidebar>
   )
@@ -126,16 +129,24 @@ function Row({ label, value }: { label: string; value: string }) {
 // ningún otro lado (X-User-Id es un UUID que pone el propio cliente), así
 // que gatear solo esto no daba seguridad real, solo fricción para quien
 // evalúa el reto.
-function FeedbackSection({ onOpenSession }: { onOpenSession: (sessionId: string) => void }) {
+function FeedbackSection({
+  onOpenSession,
+  refreshKey,
+}: {
+  onOpenSession: (sessionId: string) => void
+  refreshKey: number
+}) {
   const [entries, setEntries] = useState<FeedbackDto[] | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     void load()
-    // Solo al montar (al abrir el panel dev).
+    // Al montar (abrir el panel) y cada vez que refreshKey cambia (se mandó
+    // feedback con éxito) -- antes solo se veía la fila nueva recargando la
+    // pestaña entera.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [refreshKey])
 
   async function load() {
     setLoading(true)

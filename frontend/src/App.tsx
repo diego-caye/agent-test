@@ -32,6 +32,7 @@ export default function App() {
     removeSession,
     answerConfirmation,
     sendFeedback,
+    feedbackVersion,
   } = useChat()
   const [showDevPanel, setShowDevPanel] = useState(readDevPanelPreference)
 
@@ -149,6 +150,7 @@ export default function App() {
           metrics={state.metrics}
           onClose={() => toggleDevPanel(false)}
           onOpenSession={(id) => void openSession(id)}
+          feedbackVersion={feedbackVersion}
         />
       </SidebarProvider>
     </SidebarProvider>

@@ -220,10 +220,15 @@ export function useChat() {
     [sessionId, state.pendingConfirmation, modelId, consume, refreshSessions],
   )
 
+  // Cuenta las veces que se mandó feedback con éxito: el panel dev la usa
+  // como disparador para recargar su lista sola, en vez de necesitar F5.
+  const [feedbackVersion, setFeedbackVersion] = useState(0)
+
   const sendFeedback = useCallback(
     async (traceId: string, score: 1 | -1, message: string) => {
       if (!sessionId) return
       await api.sendFeedback(sessionId, traceId, score, message)
+      setFeedbackVersion((version) => version + 1)
     },
     [sessionId],
   )
@@ -328,5 +333,6 @@ export function useChat() {
     removeSession,
     answerConfirmation,
     sendFeedback,
+    feedbackVersion,
   }
 }
