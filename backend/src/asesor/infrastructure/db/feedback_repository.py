@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from asesor.infrastructure.db.engine import SessionFactory
 from asesor.infrastructure.db.models import FeedbackRow
@@ -64,3 +64,12 @@ class SqlFeedbackRepository:
         async with self._session_factory() as session:
             rows = (await session.scalars(statement)).all()
             return [_to_entry(row) for row in rows]
+
+    async def delete_for_session(self, session_id: str) -> None:
+        # Igual que session_titles: el feedback vive aparte de la sesión de
+        # ADK, así que borrarla no lo arrastra solo -- si no se limpia a
+        # mano, el panel de feedback queda con filas que apuntan a una
+        # sesión que ya no existe (el clic para "ir a la conversación" no
+        # tendría a dónde ir).
+        async with self._session_factory() as session, session.begin():
+            await session.execute(delete(FeedbackRow).where(FeedbackRow.session_id == session_id))

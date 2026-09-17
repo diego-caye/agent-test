@@ -59,9 +59,11 @@ async def delete_session(request: Request, user_id: UserId, session_id: str) -> 
         await _chat_service(request).delete_session(user_id, session_id)
     except SessionNotFoundError as exc:
         raise NotFoundError("Session not found") from exc
-    # El título vive aparte de la sesión de ADK (ver title_service): borrar
-    # la sesión no lo arrastra solo, hay que limpiarlo a mano.
-    await _container(request).session_titles.delete(session_id)
+    # El título y el feedback viven aparte de la sesión de ADK: borrar la
+    # sesión no los arrastra solos, hay que limpiarlos a mano.
+    container = _container(request)
+    await container.session_titles.delete(session_id)
+    await container.feedback.delete_for_session(session_id)
 
 
 @router.get("/{session_id}/messages", response_model=list[MessageDto])
