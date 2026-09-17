@@ -171,9 +171,23 @@ export function useChat() {
     //   'silent'       reintento tal cual -> ya está en pantalla, no se toca
     //   'replace-last' reintento editado -> corrige la última burbuja en su lugar
     async (text: string, mode: 'append' | 'silent' | 'replace-last' = 'append') => {
-      const id = sessionId ?? (await createSession())
       if (mode === 'append') dispatch({ type: 'user-sent', content: text })
       else if (mode === 'replace-last') dispatch({ type: 'edit-last-message', content: text })
+      // Feedback inmediato, antes de crear la sesión: para el primer mensaje
+      // de una conversación nueva ese POST es una espera de red de verdad, y
+      // sin esto la burbuja del usuario y el "escribiendo" no aparecían
+      // hasta que terminaba -- la pantalla se veía igual que el borrador
+      // vacío. Si alguien recargaba pensando que no había pasado nada, el
+      // turno quedaba cortado a medias (visto en vivo).
+      dispatch({ type: 'turn-start' })
+
+      let id: string
+      try {
+        id = sessionId ?? (await createSession())
+      } catch {
+        dispatch({ type: 'turn-failed', message: GENERIC_ERROR })
+        return
+      }
 
       const controller = new AbortController()
       abortRef.current = controller
