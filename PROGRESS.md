@@ -622,7 +622,9 @@ DoD: checklist de entrega completo. **Parar antes del merge `develop → main`.*
 
 - [x] README completo
 - [x] Diagrama Mermaid, antes/después
-- [x] `docs/demo-script.md`
+- [x] Guion de la demo — escrito y entregado en el chat de trabajo, a pedido
+  del humano no vive como archivo en el repo (`docs/demo-script.md` se quitó
+  de git en la misma ronda que se agregó, ver commit de F9)
 - [x] Sync specs ↔ código
 - [ ] PR `develop → main`
 - [ ] Tag `v1.0.0`
