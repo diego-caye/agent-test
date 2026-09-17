@@ -54,6 +54,35 @@ async def test_un_turno_que_pide_confirmacion_no_recibe_relleno() -> None:
     assert any(e.event == "hitl.confirmation_required" for e in events)
 
 
+async def test_un_turno_con_confirmacion_ignora_todo_lo_que_llegue_despues() -> None:
+    """Reproduce en vivo con gemma4:12b: tras pedir la confirmación, la MISMA
+    invocación a veces sigue produciendo eventos (una función respondida, más
+    texto) en vez de detenerse a esperar al usuario. Spec 02 §2 dice que el
+    turno cierra ahí mismo -- este test fija que `translate` lo hace de
+    verdad, sin importar qué más traiga `events` después.
+    """
+    call = types.Part.from_function_call(
+        name="adk_request_confirmation",
+        args={"toolConfirmation": {"payload": {"motivo": "TEST_DRIVE", "resumen": "x"}}},
+    )
+    response_after = Event(
+        author="user",
+        content=types.Content(
+            role="user",
+            parts=[
+                types.Part.from_function_response(
+                    name="adk_request_confirmation", response={"status": "ok"}
+                )
+            ],
+        ),
+    )
+    text_after = model_event(types.Part.from_text(text="Ya te conecto con un asesor."))
+
+    events = await collect(model_event(call), response_after, text_after)
+
+    assert [e.event for e in events] == ["hitl.confirmation_required"]
+
+
 async def test_el_texto_se_entrega_una_vez_revisado_por_l4() -> None:
     """Los parciales se acumulan: nada sale antes de que L4 vea la respuesta entera.
 
