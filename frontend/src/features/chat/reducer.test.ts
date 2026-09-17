@@ -100,16 +100,19 @@ describe('chatReducer', () => {
     expect(state.streaming).toBe(false)
   })
 
-  it('reemplaza la confirmación por el handoff creado', () => {
-    const pending = apply(initialChatState, {
-      type: 'hitl.confirmation_required',
-      confirmation_id: 'conf-1',
-      motivo: 'TEST_DRIVE',
-      resumen: 'x',
-      canal_preferido: null,
-      urgencia: null,
-    })
-    const state = apply(pending, {
+  it('reemplaza la confirmación por el handoff creado, colgado del último mensaje', () => {
+    const asked = apply(
+      chatReducer(initialChatState, { type: 'user-sent', content: 'quiero un test drive' }),
+      {
+        type: 'hitl.confirmation_required',
+        confirmation_id: 'conf-1',
+        motivo: 'TEST_DRIVE',
+        resumen: 'x',
+        canal_preferido: null,
+        urgencia: null,
+      },
+    )
+    const state = apply(asked, {
       type: 'handoff.created',
       handoff_id: 1,
       ticket: 'TICK-00001',
@@ -119,39 +122,52 @@ describe('chatReducer', () => {
     })
 
     expect(state.pendingConfirmation).toBeNull()
-    expect(state.handoff?.ticket).toBe('TICK-00001')
+    expect(state.messages.at(-1)?.decision).toEqual({
+      kind: 'handoff',
+      ticket: 'TICK-00001',
+      ya_existia: false,
+    })
   })
 
-  it('al declinar, quita la confirmación pendiente y deja el eco de la decisión', () => {
-    const pending = apply(initialChatState, {
-      type: 'hitl.confirmation_required',
-      confirmation_id: 'conf-1',
-      motivo: 'TEST_DRIVE',
-      resumen: 'x',
-      canal_preferido: null,
-      urgencia: null,
-    })
+  it('al declinar, quita la confirmación pendiente y cuelga el eco del último mensaje', () => {
+    const asked = apply(
+      chatReducer(initialChatState, { type: 'user-sent', content: 'quiero un test drive' }),
+      {
+        type: 'hitl.confirmation_required',
+        confirmation_id: 'conf-1',
+        motivo: 'TEST_DRIVE',
+        resumen: 'x',
+        canal_preferido: null,
+        urgencia: null,
+      },
+    )
 
-    const state = chatReducer(pending, { type: 'confirmation-declined' })
+    const state = chatReducer(asked, { type: 'confirmation-declined' })
 
     expect(state.pendingConfirmation).toBeNull()
-    expect(state.declinedConfirmation?.motivo).toBe('TEST_DRIVE')
+    expect(state.messages.at(-1)?.decision).toEqual({ kind: 'declined', motivo: 'TEST_DRIVE' })
   })
 
-  it('un mensaje nuevo limpia el eco de una decisión anterior', () => {
-    const pending = apply(initialChatState, {
-      type: 'hitl.confirmation_required',
-      confirmation_id: 'conf-1',
-      motivo: 'TEST_DRIVE',
-      resumen: 'x',
-      canal_preferido: null,
-      urgencia: null,
-    })
-    const declined = chatReducer(pending, { type: 'confirmation-declined' })
+  it('un mensaje nuevo NO borra el eco de una decisión anterior', () => {
+    const asked = apply(
+      chatReducer(initialChatState, { type: 'user-sent', content: 'quiero un test drive' }),
+      {
+        type: 'hitl.confirmation_required',
+        confirmation_id: 'conf-1',
+        motivo: 'TEST_DRIVE',
+        resumen: 'x',
+        canal_preferido: null,
+        urgencia: null,
+      },
+    )
+    const declined = chatReducer(asked, { type: 'confirmation-declined' })
 
+    // El bug real reportado: seguir conversando borraba el eco para siempre,
+    // aunque la fila con la decisión siguiera en pantalla.
     const state = chatReducer(declined, { type: 'user-sent', content: 'otra cosa' })
 
-    expect(state.declinedConfirmation).toBeNull()
+    const declinedMessage = state.messages.find((message) => message.decision?.kind === 'declined')
+    expect(declinedMessage?.decision).toEqual({ kind: 'declined', motivo: 'TEST_DRIVE' })
   })
 
   it('expone el error y recuerda el último mensaje para reintentar', () => {

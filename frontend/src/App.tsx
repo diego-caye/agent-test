@@ -101,8 +101,6 @@ export default function App() {
           isLocalModel={models.find((model) => model.id === modelId)?.provider === 'ollama'}
           traceId={state.metrics?.trace_id ?? null}
           onFeedback={(traceId, score, message) => void sendFeedback(traceId, score, message)}
-          handoff={state.handoff}
-          declinedConfirmation={state.declinedConfirmation}
         />
 
         <div className="flex flex-col gap-3 border-t px-4 py-4 sm:px-8">
