@@ -60,11 +60,11 @@ Catálogo del selector de modelos: las entradas que no son de Ollama vienen de `
 - 200: `{"ok": true}`
 - 404 si la sesión no pertenece al `user_id`
 
-### `GET /api/v1/feedback?limit=` (admin) [NUEVO]
+### `GET /api/v1/feedback?limit=` [NUEVO]
 - Query `limit?: int` (default 100)
 - 200: `[{"id", "session_id", "trace_id", "score", "message", "comment", "created_at"}]`, más reciente primero
-- Cruza sesiones ajenas (es un panel de revisión, no una vista del propio usuario): mismo `admin_token` por `Authorization: Bearer` que `/handoffs`, no `X-User-Id`
-- Consumido por el Panel dev del frontend (sección "Feedback"): cada fila es clickeable y navega a `/c/:session_id` de esa conversación
+- Cruza sesiones ajenas (es un panel de revisión, no una vista del propio usuario) pero **sin token ni `X-User-Id`**: el proyecto no tiene un modelo de auth real en ningún otro lado (`X-User-Id` es un UUID que pone el propio cliente), así que gatearlo no daba seguridad de verdad — solo fricción para quien evalúa el reto. A diferencia de `/handoffs`, que sí cambia estado real (`PATCH`) y se queda con `admin_token`.
+- Consumido por el Panel dev del frontend (sección "Feedback"): carga sola al abrir el panel, cada fila es clickeable y navega a `/c/:session_id` de esa conversación (falla con normalidad — vuelve al borrador — si esa sesión no es del usuario actual, mismo chequeo que cualquier otra navegación a una conversación)
 
 ### `GET /api/v1/handoffs?status=` (admin)
 - Query `status?: OPEN | IN_PROGRESS | CLOSED`

@@ -4,7 +4,6 @@ import { ThumbsDown, ThumbsUp, X } from 'lucide-react'
 import { api } from '../../api/client'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { Sidebar, SidebarContent, SidebarHeader } from '@/components/ui/sidebar'
 
@@ -18,8 +17,6 @@ type Props = {
   onClose: () => void
   onOpenSession: (sessionId: string) => void
 }
-
-const ADMIN_TOKEN_KEY = 'asesor.admin_token'
 
 const LANGFUSE_PROJECT = import.meta.env['VITE_LANGFUSE_PROJECT_ID'] as string | undefined
 // Sin esto, un plan que no vive en el cloud.langfuse.com por defecto (p. ej.
@@ -125,77 +122,31 @@ function Row({ label, value }: { label: string; value: string }) {
   )
 }
 
-function readStoredAdminToken(): string {
-  try {
-    return localStorage.getItem(ADMIN_TOKEN_KEY) ?? ''
-  } catch {
-    return ''
-  }
-}
-
-// Sección aparte, gated por admin_token (spec 02/03, mismo mecanismo que
-// /handoffs): cruza sesiones ajenas, así que no puede vivir detrás del
-// X-User-Id normal del usuario que tiene el panel dev abierto.
+// Sin token ni login: el proyecto no tiene un modelo de auth de verdad en
+// ningún otro lado (X-User-Id es un UUID que pone el propio cliente), así
+// que gatear solo esto no daba seguridad real, solo fricción para quien
+// evalúa el reto.
 function FeedbackSection({ onOpenSession }: { onOpenSession: (sessionId: string) => void }) {
-  const [token, setToken] = useState(readStoredAdminToken)
-  const [tokenDraft, setTokenDraft] = useState('')
   const [entries, setEntries] = useState<FeedbackDto[] | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Si ya se recordó un token de una vez anterior, carga sola al abrir el
-  // panel dev, en vez de dejar el clic de "Actualizar" como único disparador.
   useEffect(() => {
-    if (token) void load(token)
-    // Solo al montar: token cambia dentro de load() mismo, no hay que reaccionar a eso.
+    void load()
+    // Solo al montar (al abrir el panel dev).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  async function load(withToken: string) {
+  async function load() {
     setLoading(true)
     setError(null)
     try {
-      const list = await api.listFeedback(withToken)
-      setEntries(list)
-      try {
-        localStorage.setItem(ADMIN_TOKEN_KEY, withToken)
-      } catch {
-        // Solo comodidad: si no se puede recordar, se vuelve a pedir la próxima vez.
-      }
-      setToken(withToken)
+      setEntries(await api.listFeedback())
     } catch {
-      setError('Token inválido o sin acceso.')
-      setEntries(null)
+      setError('No se pudo cargar el feedback.')
     } finally {
       setLoading(false)
     }
-  }
-
-  if (!token) {
-    return (
-      <section>
-        <Label>Feedback</Label>
-        <form
-          className="mt-1.5 flex gap-1.5"
-          onSubmit={(event) => {
-            event.preventDefault()
-            if (tokenDraft.trim()) void load(tokenDraft.trim())
-          }}
-        >
-          <Input
-            type="password"
-            placeholder="Admin token"
-            value={tokenDraft}
-            onChange={(event) => setTokenDraft(event.target.value)}
-            className="h-7 text-xs"
-          />
-          <Button type="submit" size="xs" variant="outline" disabled={loading}>
-            Ver
-          </Button>
-        </form>
-        {error && <p className="text-destructive mt-1 text-xs">{error}</p>}
-      </section>
-    )
   }
 
   return (
@@ -207,7 +158,7 @@ function FeedbackSection({ onOpenSession }: { onOpenSession: (sessionId: string)
           size="xs"
           variant="ghost"
           className="text-muted-foreground h-5 px-1.5 text-[11px]"
-          onClick={() => void load(token)}
+          onClick={() => void load()}
           disabled={loading}
         >
           Actualizar

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request
 
-from asesor.api.dependencies import Admin, UserId
+from asesor.api.dependencies import UserId
 from asesor.api.dtos import FeedbackDto, FeedbackRequest, FeedbackResponse
 from asesor.api.errors import NotFoundError
 from asesor.application.chat_service import ChatService, SessionNotFoundError
@@ -65,7 +65,12 @@ async def submit_feedback(
 
 
 @router.get("", response_model=list[FeedbackDto])
-async def list_feedback(request: Request, _: Admin, limit: int = 100) -> list[FeedbackDto]:
+async def list_feedback(request: Request, limit: int = 100) -> list[FeedbackDto]:
+    # Sin admin_token a propósito: el proyecto no tiene un modelo de auth de
+    # verdad en ningún otro lado (X-User-Id es un UUID que pone el propio
+    # cliente, trivial de falsear), así que pedirle un token a quien evalúa
+    # el reto solo para ver el panel de feedback era fricción sin ninguna
+    # seguridad real detrás -- a pedido del humano.
     container = _container(request)
     entries = await container.feedback.list(limit)
     return [_to_dto(entry) for entry in entries]

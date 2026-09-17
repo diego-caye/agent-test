@@ -68,10 +68,7 @@ function headers(): HeadersInit {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
-    ...init,
-    headers: { ...headers(), ...(init?.headers as Record<string, string> | undefined) },
-  })
+  const response = await fetch(path, { ...init, headers: headers() })
   if (!response.ok) throw new Error(`${init?.method ?? 'GET'} ${path} → ${response.status}`)
   if (response.status === 204) return undefined as T
   return (await response.json()) as T
@@ -91,13 +88,9 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ session_id: sessionId, trace_id: traceId, score, message }),
     }),
-  // Admin-gated (mismo mecanismo que /handoffs): cruza sesiones ajenas, no
-  // cuelga del X-User-Id normal. El token se lo da el humano al abrir la
-  // sección de feedback del panel dev, no vive hardcodeado en el bundle.
-  listFeedback: (adminToken: string, limit = 50) =>
-    request<FeedbackDto[]>(`/api/v1/feedback?limit=${limit}`, {
-      headers: { Authorization: `Bearer ${adminToken}` },
-    }),
+  // Sin token: el proyecto no tiene auth real en ningún otro lado (spec 02),
+  // así que gatear solo esto no daba seguridad de verdad, solo fricción.
+  listFeedback: (limit = 50) => request<FeedbackDto[]>(`/api/v1/feedback?limit=${limit}`),
 }
 
 // Exportada solo para que el test del timeout pueda pasar un plazo corto y
