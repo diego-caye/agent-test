@@ -91,8 +91,10 @@ class GuardrailPlugin(BasePlugin):
         cleaned = strip_pseudo_tool_calls(text)
         if cleaned != text:
             logger.warning("el modelo escribió una llamada a tool como texto")
-            if not cleaned:
-                return None
+            # Si la respuesta ERA solo la llamada, no hay nada bueno que
+            # dejar: `_canned("")` reemplaza igual (devolver None aquí
+            # dejaba pasar el texto ORIGINAL sin recortar -- "Returning
+            # None allows the original response to be used", per ADK).
             return _canned(cleaned, "L4", "pseudo_tool_call")
 
         verdict = inspect_reply(text, self._canary_token, CANNED_JAILBREAK)

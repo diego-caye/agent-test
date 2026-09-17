@@ -1,4 +1,8 @@
+from typing import Any, cast
+
 import pytest
+from google.adk.models.llm_response import LlmResponse
+from google.genai import types
 
 from asesor.agent.guardrails.l1 import MAX_MESSAGE_CHARS, inspect_message, normalize
 from asesor.agent.guardrails.l4 import (
@@ -6,6 +10,8 @@ from asesor.agent.guardrails.l4 import (
     inspect_reply,
     strip_pseudo_tool_calls,
 )
+from asesor.agent.guardrails.plugin import GuardrailPlugin
+from asesor.agent.parts import visible_text
 
 CANARY = "CANARY-TEST-0001"
 JAILBREAK = "No puedo realizar esa acción."
@@ -145,6 +151,21 @@ def test_l4_deja_pasar_asesoria_legitima(reply: str) -> None:
             "Un momento.\n<|tool|>:search_knowledge_base[query: suv]\nListo.",
             "Un momento.\nListo.",
         ),
+        # Caso real del modelo de respaldo (llama3.2:3b) visto en vivo: objeto
+        # JSON mal formado (sin ":" antes de "parameters", llaves sin
+        # cerrar) en vez de una function call real. No se intenta recortar
+        # solo esa parte -- si aparece la firma `"name": "<tool>"`, toda la
+        # respuesta se descarta.
+        (
+            '{"name":"guardar_lead","parameters{"nombre": "Diego",'
+            '"uso_principal": "FAMILIA"}}',
+            "",
+        ),
+        (
+            "Ya anoté tus datos. "
+            '{"name": "guardar_lead", "parameters": {"nombre": "Ana"}}',
+            "",
+        ),
     ],
 )
 def test_l4_quita_llamadas_a_tools_escritas_como_texto(respuesta: str, esperado: str) -> None:
@@ -154,3 +175,31 @@ def test_l4_quita_llamadas_a_tools_escritas_como_texto(respuesta: str, esperado:
 def test_l4_no_toca_una_mencion_normal_a_una_herramienta() -> None:
     texto = "Voy a revisar la guía técnica para darte el dato exacto."
     assert strip_pseudo_tool_calls(texto) == texto
+
+
+async def test_after_model_callback_no_deja_pasar_el_original_si_todo_era_la_tool() -> None:
+    """Bug real: cuando la respuesta ENTERA era una pseudo-llamada a tool,
+    `after_model_callback` devolvía None -- "Returning None allows the
+    original response to be used" (docstring de ADK) -- así que el texto
+    CRUDO (sin recortar) le llegaba igual al usuario. Visto en vivo con el
+    modelo de respaldo (llama3.2:3b): la burbuja del chat mostraba el JSON
+    entero de la llamada en vez de un saludo."""
+    plugin = GuardrailPlugin(canary_token=CANARY, max_tool_calls=4)
+    original = types.Content(
+        role="model",
+        parts=[
+            types.Part.from_text(
+                text='{"name":"guardar_lead","parameters{"nombre": "Diego"}}'
+            )
+        ],
+    )
+    response = LlmResponse(content=original)
+
+    result = await plugin.after_model_callback(
+        callback_context=cast(Any, None), llm_response=response
+    )
+
+    assert result is not None
+    assert result.content is not None
+    assert visible_text(result.content) != visible_text(original)
+    assert visible_text(result.content) == ""

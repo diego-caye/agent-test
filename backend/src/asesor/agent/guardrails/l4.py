@@ -39,6 +39,17 @@ _PSEUDO_TOOL_CALL = re.compile(
     re.IGNORECASE,
 )
 
+# Otra forma de "escribir" la tool: un objeto JSON tipo
+# {"name": "guardar_lead", "parameters": {...}} -- visto con el modelo de
+# respaldo (llama3.2:3b) vía LiteLLM. A veces sale mal formado (sin ":" antes
+# de "parameters", llaves sin cerrar), así que no vale la pena recortar solo
+# esa parte con un regex: si aparece esta firma, toda la respuesta es
+# sospechosa y se descarta entera en vez de intentar salvar el resto.
+_JSON_ENVELOPE_TOOL_CALL = re.compile(
+    r"""["']name["']\s*:\s*["'](?:""" + "|".join(TOOL_NAMES) + r")[\"']",
+    re.IGNORECASE,
+)
+
 
 @dataclass(frozen=True, slots=True)
 class L4Verdict:
@@ -49,6 +60,9 @@ class L4Verdict:
 
 def strip_pseudo_tool_calls(text: str) -> str:
     """Quita las llamadas a tools que el modelo escribió como texto."""
+    if _JSON_ENVELOPE_TOOL_CALL.search(text):
+        return ""
+
     without = _PSEUDO_TOOL_CALL.sub("", text)
     # El patrón se come el separador que iba delante, así que hay que dejar los
     # espacios y los saltos como estaban antes de recortar.
