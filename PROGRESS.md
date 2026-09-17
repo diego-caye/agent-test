@@ -914,3 +914,29 @@ había registrado cortaba el turno a medias.
   inmediato (~70ms, verificado), sin importar cuánto tarde crear la
   sesión. Si `createSession()` falla, despacha `turn-failed` en vez de
   dejar la promesa sin manejar.
+
+### Dos bugs más reportados en vivo: el eco se borraba, y a veces el mensaje entero desaparecía
+
+- [x] **El eco de la derivación (ticket o "Ahora no") vivía en un campo
+  global** (`handoff`/`declinedConfirmation`) que `user-sent` limpiaba en
+  cada mensaje nuevo — se borraba para siempre al seguir conversando,
+  aunque la fila con la decisión siguiera en la conversación. Movido a un
+  campo `decision` colgado del propio `Message`: sobrevive porque el
+  mensaje nunca se borra. 3 tests del reducer reescritos, uno invertido a
+  propósito ("un mensaje nuevo NO borra el eco de una decisión anterior").
+- [x] **El bug más serio, encontrado depurando el anterior:** a veces la
+  burbuja del usuario y la respuesta entera desaparecían al mandar el
+  primer mensaje de una conversación nueva, como si nunca se hubiera
+  enviado — aunque el backend sí lo había recibido. Diagnóstico con un log
+  temporal de cada acción del reducer: `navigate()` disparaba un
+  `popstate` sintético que relanzaba `loadSessionData()` para la sesión
+  recién creada; como el backend todavía no tenía el mensaje procesado,
+  esa carga volvía con `messages: []` y pisaba por completo el estado
+  optimista que el fix anterior (feedback inmediato) acababa de poner —
+  un bug preexistente que ese mismo fix hizo mucho más fácil de disparar,
+  al ensanchar la ventana de la carrera. `navigate()` ya no dispara el
+  evento a mano: cada quien la llama ya maneja su propio estado.
+
+Verificado en el navegador (bubble + eco visibles de inmediato y
+sobreviven a mandar otro mensaje). Suite completa: 196 tests de backend,
+mypy y ruff limpios; typecheck, build y 24 tests de frontend limpios.
