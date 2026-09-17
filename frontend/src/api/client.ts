@@ -1,5 +1,6 @@
 import { createSseParser, toServerEvent } from './sse'
 import type {
+  FeedbackDto,
   LeadResponse,
   MessageDto,
   ModelOption,
@@ -67,7 +68,10 @@ function headers(): HeadersInit {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, { ...init, headers: headers() })
+  const response = await fetch(path, {
+    ...init,
+    headers: { ...headers(), ...(init?.headers as Record<string, string> | undefined) },
+  })
   if (!response.ok) throw new Error(`${init?.method ?? 'GET'} ${path} → ${response.status}`)
   if (response.status === 204) return undefined as T
   return (await response.json()) as T
@@ -82,10 +86,17 @@ export const api = {
   deleteSession: (sessionId: string) =>
     request<void>(`/api/v1/sessions/${sessionId}`, { method: 'DELETE' }),
   listModels: () => request<ModelOption[]>('/api/v1/models'),
-  sendFeedback: (sessionId: string, traceId: string, score: 1 | -1) =>
+  sendFeedback: (sessionId: string, traceId: string, score: 1 | -1, message: string) =>
     request<{ ok: boolean }>('/api/v1/feedback', {
       method: 'POST',
-      body: JSON.stringify({ session_id: sessionId, trace_id: traceId, score }),
+      body: JSON.stringify({ session_id: sessionId, trace_id: traceId, score, message }),
+    }),
+  // Admin-gated (mismo mecanismo que /handoffs): cruza sesiones ajenas, no
+  // cuelga del X-User-Id normal. El token se lo da el humano al abrir la
+  // sección de feedback del panel dev, no vive hardcodeado en el bundle.
+  listFeedback: (adminToken: string, limit = 50) =>
+    request<FeedbackDto[]>(`/api/v1/feedback?limit=${limit}`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
     }),
 }
 

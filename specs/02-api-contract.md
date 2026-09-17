@@ -55,9 +55,16 @@ Catálogo del selector de modelos: las entradas que no son de Ollama vienen de `
 - No requiere `X-User-Id`: es configuración del despliegue, no del usuario
 
 ### `POST /api/v1/feedback`
-- Body: `{"session_id": str, "trace_id": str, "score": 1 | -1, "comment"?: str (≤500)}`
+- Body: `{"session_id": str, "trace_id": str, "score": 1 | -1, "message": str (1-4000), "comment"?: str (≤500)}`
+- `message` es el texto de la respuesta del agente que se está calificando (denormalizado al momento del feedback, no un join contra el historial de ADK — el panel de feedback lo lista sin depender de que la sesión siga teniendo ese evento).
 - 200: `{"ok": true}`
 - 404 si la sesión no pertenece al `user_id`
+
+### `GET /api/v1/feedback?limit=` (admin) [NUEVO]
+- Query `limit?: int` (default 100)
+- 200: `[{"id", "session_id", "trace_id", "score", "message", "comment", "created_at"}]`, más reciente primero
+- Cruza sesiones ajenas (es un panel de revisión, no una vista del propio usuario): mismo `admin_token` por `Authorization: Bearer` que `/handoffs`, no `X-User-Id`
+- Consumido por el Panel dev del frontend (sección "Feedback"): cada fila es clickeable y navega a `/c/:session_id` de esa conversación
 
 ### `GET /api/v1/handoffs?status=` (admin)
 - Query `status?: OPEN | IN_PROGRESS | CLOSED`

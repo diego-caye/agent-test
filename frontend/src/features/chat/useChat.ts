@@ -207,9 +207,9 @@ export function useChat() {
   )
 
   const sendFeedback = useCallback(
-    async (traceId: string, score: 1 | -1) => {
+    async (traceId: string, score: 1 | -1, message: string) => {
       if (!sessionId) return
-      await api.sendFeedback(sessionId, traceId, score)
+      await api.sendFeedback(sessionId, traceId, score, message)
     },
     [sessionId],
   )

@@ -104,6 +104,7 @@ class FeedbackRow(Base):
     user_id: Mapped[UUID] = mapped_column(PgUUID(as_uuid=True), index=True)
     trace_id: Mapped[str] = mapped_column(String(64))
     score: Mapped[int] = mapped_column(Integer)
+    message: Mapped[str] = mapped_column(Text)
     comment: Mapped[str | None] = mapped_column(String(500), default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

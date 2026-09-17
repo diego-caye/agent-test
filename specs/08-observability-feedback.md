@@ -29,7 +29,9 @@ Todos son hijos del span de turno abierto por `ChatService` (que lleva `trace_id
 
 ## 4. Feedback de usuario
 
-`POST /api/v1/feedback {session_id, trace_id, score: 1 | -1, comment?}` → inserta en tabla `feedback` **y** registra un score `user-feedback` en Langfuse contra el `trace_id` recibido (Langfuse permite adjuntar scores a un trace ya cerrado). Si Langfuse no está configurado, solo se persiste en la tabla — no es bloqueante.
+`POST /api/v1/feedback {session_id, trace_id, score: 1 | -1, message, comment?}` → inserta en tabla `feedback` **y** registra un score `user-feedback` en Langfuse contra el `trace_id` recibido (Langfuse permite adjuntar scores a un trace ya cerrado). Si Langfuse no está configurado, solo se persiste en la tabla — no es bloqueante. `message` (el texto de la respuesta calificada) se guarda denormalizado en la propia fila, para poder listar el feedback sin depender de que el historial de ADK siga teniendo ese evento.
+
+`GET /api/v1/feedback?limit=` (admin, mismo `admin_token` que `/handoffs`) lista el feedback más reciente primero. El frontend lo consume en el Panel dev (sección "Feedback"): pide el token una vez, lo recuerda en `localStorage`, y cada fila es clickeable — navega a `/c/:session_id` de la conversación donde se dio ese feedback, en vez de quedar como un número suelto sin contexto.
 
 ## 5. Evaluación post-ejecución (P1)
 
