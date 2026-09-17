@@ -684,11 +684,11 @@ entrega en vez de dejarlo documentado como límite conocido:
   ahora solo estoy mirando" con `gemma4:12b` llamó la tool, dijo la frase
   exacta, y `GET /lead` devolvió `solo_mirando: true`.
 
-### Repaso contra el PDF del reto y su rúbrica de evaluación
+### Auditoría de conformidad con el enunciado y su rúbrica de evaluación
 
 A pedido del humano, antes de la parada obligatoria de `develop → main` se
-releyó el enunciado completo (rúbrica incluida) contra el estado real del
-código, no solo contra los specs. Dos ajustes:
+verificó el estado real del código contra el enunciado completo (rúbrica
+incluida), no solo contra los specs. Dos ajustes:
 
 - [x] **README ganó una justificación del framework escrita directo, no solo
   enlazada.** El enunciado pide "justificación técnica del framework
@@ -725,10 +725,11 @@ Frontend: typecheck, build y 22 tests de vitest limpios.
 
 Suite completa: 192 tests, mypy y ruff limpios.
 
-### Segundo repaso contra el PDF, a pedido del humano
+### Ronda adicional de la auditoría de conformidad, a pedido del humano
 
-Releído el PDF completo (MVP, entregables y rúbrica) de nuevo, no solo la
-memoria de la ronda anterior. Un hallazgo real:
+Verificación adicional del código contra el enunciado (MVP, entregables y
+rúbrica), no solo contra el estado documentado en la ronda anterior. Un
+hallazgo real:
 
 - [x] **"Asesor general, no asociado a marcas específicas ni sistemas de
   fondos colectivos" nunca estaba en la instrucción del agente** — es el
