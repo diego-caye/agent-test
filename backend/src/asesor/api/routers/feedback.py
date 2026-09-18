@@ -74,3 +74,14 @@ async def list_feedback(request: Request, limit: int = 100) -> list[FeedbackDto]
     container = _container(request)
     entries = await container.feedback.list(limit)
     return [_to_dto(entry) for entry in entries]
+
+
+@router.delete("/{feedback_id}", status_code=204)
+async def delete_feedback(request: Request, feedback_id: int) -> None:
+    # Mismo criterio que el GET de arriba: sin admin_token ni X-User-Id, es
+    # un panel de revisión y el proyecto no tiene auth real en ningún otro
+    # lado. Sí lo gatearía si borrase algo más que la fila del panel dev.
+    container = _container(request)
+    deleted = await container.feedback.delete(feedback_id)
+    if not deleted:
+        raise NotFoundError("Feedback not found")

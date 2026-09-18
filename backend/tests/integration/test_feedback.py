@@ -196,3 +196,30 @@ async def test_listar_feedback_devuelve_lo_mas_reciente_primero_con_mensaje(
     assert entries[0]["message"] == "segundo mensaje"
     assert entries[0]["session_id"] == session_id
     assert entries[1]["message"] == "primer mensaje"
+
+
+async def test_borrar_feedback_por_id(client: AsyncClient, user_id: UUID) -> None:
+    session_id = await new_session(client, user_id)
+    await client.post(
+        "/api/v1/feedback",
+        json={
+            "session_id": session_id,
+            "trace_id": "trace-borrar",
+            "score": 1,
+            "message": "este feedback se borra solo",
+        },
+        headers={"X-User-Id": str(user_id)},
+    )
+    entries = (await client.get("/api/v1/feedback")).json()
+    feedback_id = next(e["id"] for e in entries if e["trace_id"] == "trace-borrar")
+
+    delete_response = await client.delete(f"/api/v1/feedback/{feedback_id}")
+    assert delete_response.status_code == 204
+
+    entries_after = (await client.get("/api/v1/feedback")).json()
+    assert all(e["id"] != feedback_id for e in entries_after)
+
+
+async def test_borrar_feedback_404_si_no_existe(client: AsyncClient) -> None:
+    response = await client.delete("/api/v1/feedback/999999")
+    assert response.status_code == 404

@@ -65,6 +65,14 @@ class SqlFeedbackRepository:
             rows = (await session.scalars(statement)).all()
             return [_to_entry(row) for row in rows]
 
+    async def delete(self, feedback_id: int) -> bool:
+        async with self._session_factory() as session, session.begin():
+            row = await session.get(FeedbackRow, feedback_id)
+            if row is None:
+                return False
+            await session.delete(row)
+            return True
+
     async def delete_for_session(self, session_id: str) -> None:
         # Igual que session_titles: el feedback vive aparte de la sesión de
         # ADK, así que borrarla no lo arrastra solo -- si no se limpia a

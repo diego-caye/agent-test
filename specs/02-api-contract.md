@@ -66,6 +66,11 @@ Catálogo del selector de modelos: las entradas que no son de Ollama vienen de `
 - Cruza sesiones ajenas (es un panel de revisión, no una vista del propio usuario) pero **sin token ni `X-User-Id`**: el proyecto no tiene un modelo de auth real en ningún otro lado (`X-User-Id` es un UUID que pone el propio cliente), así que gatearlo no daba seguridad de verdad — solo fricción para quien evalúa el reto. A diferencia de `/handoffs`, que sí cambia estado real (`PATCH`) y se queda con `admin_token`.
 - Consumido por el Panel dev del frontend (sección "Feedback"): carga sola al abrir el panel, cada fila es clickeable y navega a `/c/:session_id` de esa conversación (falla con normalidad — vuelve al borrador — si esa sesión no es del usuario actual, mismo chequeo que cualquier otra navegación a una conversación)
 
+### `DELETE /api/v1/feedback/{id}` [NUEVO]
+- 204 si se borró; 404 si no existe
+- Mismo criterio de auth que el `GET` de arriba (sin `X-User-Id` ni `admin_token`): borra una fila del panel de revisión, no un recurso del usuario
+- Consumido por el Panel dev (sección "Feedback"): ícono de basura por fila, igual que "Eliminar conversación" en el sidebar — quita la fila localmente sin recargar el resto del panel
+
 ### `GET /api/v1/handoffs?status=` (admin)
 - Query `status?: OPEN | IN_PROGRESS | CLOSED`
 - 200: `[{"id", "session_id", "user_id", "motivo", "resumen_requerimiento", "canal_preferido", "urgencia", "status", "created_at"}]`
