@@ -91,6 +91,7 @@ export const api = {
   // Sin token: el proyecto no tiene auth real en ningún otro lado (spec 02),
   // así que gatear solo esto no daba seguridad de verdad, solo fricción.
   listFeedback: (limit = 50) => request<FeedbackDto[]>(`/api/v1/feedback?limit=${limit}`),
+  deleteFeedback: (id: number) => request<void>(`/api/v1/feedback/${id}`, { method: 'DELETE' }),
 }
 
 // Exportada solo para que el test del timeout pueda pasar un plazo corto y
