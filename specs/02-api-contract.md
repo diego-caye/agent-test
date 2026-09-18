@@ -23,8 +23,9 @@ Borra una conversación del usuario del header, con sus eventos.
 
 ### `GET /api/v1/sessions/{id}/messages`
 Historial de una sesión.
-- 200: `[{"role": "user"|"agent", "content", "created_at"}]`
+- 200: `[{"role": "user"|"agent", "content", "created_at", "decision"?}]`
 - 404 si la sesión no existe o no pertenece al `user_id` del header
+- `decision` [NUEVO] es el eco persistente de una confirmación HITL ya resuelta (spec 03 §3), reconstruido de los eventos de ADK (la tool `solicitar_contacto_humano` responde con el resultado final tanto al confirmar como al declinar, aunque solo el primero cree un handoff real): `{"kind": "handoff", "ticket", "ya_existia"}` o `{"kind": "declined", "motivo"}`, colgado del último mensaje antes de la respuesta de la tool. Antes solo vivía en el estado de React de esa pestaña — recargar la conversación (o abrirla en otra) perdía el aviso de "derivado"/"ahora no" y el mensaje del agente quedaba como uno más.
 
 ### `GET /api/v1/sessions/{id}/lead`
 Ficha actual del lead asociado al usuario dueño de la sesión.

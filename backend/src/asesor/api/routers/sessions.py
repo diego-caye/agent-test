@@ -7,6 +7,8 @@ from asesor.agent.state import read_dialog_state
 from asesor.api.dependencies import UserId
 from asesor.api.dtos import (
     CreateSessionResponse,
+    DeclinedDecision,
+    HandoffDecision,
     LeadDto,
     LeadResponse,
     MessageDto,
@@ -17,6 +19,8 @@ from asesor.application.chat_service import ChatService, SessionNotFoundError
 from asesor.infrastructure.container import Container
 
 router = APIRouter(prefix="/api/v1/sessions", tags=["sessions"])
+
+HANDOFF_TOOL_NAME = "solicitar_contacto_humano"
 
 
 def _container(request: Request) -> Container:
@@ -74,9 +78,39 @@ async def list_messages(request: Request, user_id: UserId, session_id: str) -> l
         raise NotFoundError("Session not found") from exc
 
     messages: list[MessageDto] = []
+    # El motivo del handoff no viaja en su respuesta final (ver
+    # handoff_tools.py: "cancelado" no lo incluye), pero sí en los args de la
+    # llamada original a la tool -- misma id que su(s) respuesta(s), la
+    # pendiente y la final (verificado contra una sesión real, no de memoria:
+    # ADK 2.x no se escribe sin comprobar el paquete instalado).
+    motivo_by_call_id: dict[str, str] = {}
+
     for event in session.events:
         if event.content is None:
             continue
+
+        for call in event.get_function_calls():
+            if call.name == HANDOFF_TOOL_NAME and call.id:
+                motivo = (call.args or {}).get("motivo")
+                if motivo:
+                    motivo_by_call_id[call.id] = motivo
+
+        for response in event.get_function_responses():
+            if response.name != HANDOFF_TOOL_NAME or not messages:
+                continue
+            data = response.response.get("data") if isinstance(response.response, dict) else None
+            if not isinstance(data, dict):
+                continue
+            if data.get("ticket"):
+                messages[-1].decision = HandoffDecision(
+                    ticket=data["ticket"], ya_existia=bool(data.get("ya_existia", False))
+                )
+            elif data.get("cancelado"):
+                # Motivo desconocido (no debería pasar, ver comentario arriba):
+                # la propia tarjeta del frontend cae a una etiqueta genérica.
+                motivo = motivo_by_call_id.get(response.id or "", "")
+                messages[-1].decision = DeclinedDecision(motivo=motivo)
+
         text = visible_text(event.content)
         if not text or event.partial:
             continue

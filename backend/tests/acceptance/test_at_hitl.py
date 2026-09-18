@@ -144,6 +144,51 @@ async def test_at10_segundo_pedido_con_handoff_abierto_es_idempotente(
     assert len(listed.json()) == 1
 
 
+async def test_confirmar_deja_la_decision_en_el_historial(
+    client: AsyncClient, fake_llm: FakeAdkLlm, user_id: UUID
+) -> None:
+    fake_llm.rules = {"test drive": TEST_DRIVE_TURNS}
+    session_id = await new_session(client, user_id)
+
+    asked = await send_message(client, user_id, session_id, "quiero un test drive")
+    resumed = await confirm(client, user_id, session_id, confirmation_id_of(asked), approved=True)
+    ticket = next(e for e in resumed if e.event == "handoff.created").data["ticket"]
+
+    messages = (
+        await client.get(
+            f"/api/v1/sessions/{session_id}/messages", headers={"X-User-Id": str(user_id)}
+        )
+    ).json()
+
+    with_decision = [m for m in messages if m.get("decision")]
+    assert len(with_decision) == 1
+    assert with_decision[0]["decision"] == {
+        "kind": "handoff",
+        "ticket": ticket,
+        "ya_existia": False,
+    }
+
+
+async def test_declinar_deja_la_decision_en_el_historial(
+    client: AsyncClient, fake_llm: FakeAdkLlm, user_id: UUID
+) -> None:
+    fake_llm.rules = {"test drive": TEST_DRIVE_TURNS}
+    session_id = await new_session(client, user_id)
+
+    asked = await send_message(client, user_id, session_id, "quiero un test drive")
+    await confirm(client, user_id, session_id, confirmation_id_of(asked), approved=False)
+
+    messages = (
+        await client.get(
+            f"/api/v1/sessions/{session_id}/messages", headers={"X-User-Id": str(user_id)}
+        )
+    ).json()
+
+    with_decision = [m for m in messages if m.get("decision")]
+    assert len(with_decision) == 1
+    assert with_decision[0]["decision"] == {"kind": "declined", "motivo": "TEST_DRIVE"}
+
+
 async def test_admin_endpoints_requieren_token(client: AsyncClient) -> None:
     assert (await client.get("/api/v1/handoffs")).status_code == 401
     assert (

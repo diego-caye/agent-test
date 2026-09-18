@@ -75,6 +75,10 @@ export function useChat() {
         role: message.role === 'user' ? 'user' : 'agent',
         content: message.content,
         streaming: false,
+        // Eco persistente de una confirmación HITL ya resuelta (spec 02): sin
+        // esto, recargar una conversación con handoff perdía el aviso de
+        // "derivado"/"ahora no" y el mensaje quedaba como uno más.
+        ...(message.decision ? { decision: message.decision } : {}),
       }),
     )
     // Si la conversación termina en un mensaje del usuario, ese turno nunca
