@@ -157,13 +157,11 @@ def test_l4_deja_pasar_asesoria_legitima(reply: str) -> None:
         # solo esa parte -- si aparece la firma `"name": "<tool>"`, toda la
         # respuesta se descarta.
         (
-            '{"name":"guardar_lead","parameters{"nombre": "Diego",'
-            '"uso_principal": "FAMILIA"}}',
+            '{"name":"guardar_lead","parameters{"nombre": "Diego","uso_principal": "FAMILIA"}}',
             "",
         ),
         (
-            "Ya anoté tus datos. "
-            '{"name": "guardar_lead", "parameters": {"nombre": "Ana"}}',
+            'Ya anoté tus datos. {"name": "guardar_lead", "parameters": {"nombre": "Ana"}}',
             "",
         ),
     ],
@@ -187,11 +185,7 @@ async def test_after_model_callback_no_deja_pasar_el_original_si_todo_era_la_too
     plugin = GuardrailPlugin(canary_token=CANARY, max_tool_calls=4)
     original = types.Content(
         role="model",
-        parts=[
-            types.Part.from_text(
-                text='{"name":"guardar_lead","parameters{"nombre": "Diego"}}'
-            )
-        ],
+        parts=[types.Part.from_text(text='{"name":"guardar_lead","parameters{"nombre": "Diego"}}')],
     )
     response = LlmResponse(content=original)
 
