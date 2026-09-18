@@ -43,7 +43,7 @@ cd backend && uv run ruff check . && uv run ruff format --check .   # lint
 cd backend && uv run mypy                                          # typecheck
 cd backend && uv run pytest                                        # tests
 cd frontend && npm run typecheck && npm run build                  # frontend
-cd backend && uv run python scripts/ingest_kb.py                   # ingesta de la KB
+docker compose exec backend uv run python scripts/ingest_kb.py     # ingesta de la KB (scripts/ y kb/ montados en el backend)
 docker compose up -d                                              # make up (recarga en caliente; --build solo si cambian dependencias)
 ```
 

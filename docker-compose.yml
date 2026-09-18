@@ -67,6 +67,16 @@ services:
       # El paquete se instala en modo editable, así que el contenedor ejecuta
       # directamente lo que hay aquí montado.
       - ./backend/src:/app/src
+      # scripts/ no se copia a la imagen (solo pyproject.toml, uv.lock y src,
+      # ver Dockerfile): sin este mount, `docker compose exec backend uv run
+      # python scripts/ingest_kb.py` fallaba con "No such file or directory"
+      # para quien clona el repo con solo Docker, sin uv/Python nativo.
+      - ./backend/scripts:/app/scripts:ro
+      # ingest_kb.py resuelve su --kb-dir por defecto como
+      # Path(__file__).parents[2] / "kb": con scripts/ en /app/scripts, eso
+      # cae en /kb -- de ahí este punto de montaje exacto, para no tener que
+      # pasar --kb-dir a mano ni duplicar la ruta en dos lugares.
+      - ./kb:/kb:ro
     depends_on:
       db:
         condition: service_healthy

@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help install up up-llm rebuild down logs ps lint fmt typecheck test build ci clean migrate
+.PHONY: help install up up-llm rebuild down logs ps lint fmt typecheck test build ci clean migrate ingest-kb
 
 BACKEND := backend
 FRONTEND := frontend
@@ -11,6 +11,7 @@ help:
 	@echo "rebuild    reconstruye las imagenes (solo si cambian dependencias)"
 	@echo "down       apaga los servicios"
 	@echo "migrate    aplica las migraciones de Alembic"
+	@echo "ingest-kb  (re)ingesta la base de conocimiento (RAG) dentro del contenedor"
 	@echo "logs       sigue los logs de los servicios"
 	@echo "lint       ruff check + ruff format --check"
 	@echo "fmt        aplica ruff format"
@@ -46,6 +47,12 @@ ps:
 
 migrate:
 	cd $(BACKEND) && uv run alembic upgrade head
+
+# scripts/ y kb/ se montan en el propio backend (docker-compose.yml) para
+# esto: quien clone el repo con solo Docker, sin uv/Python nativo, puede
+# ingestar la KB igual.
+ingest-kb:
+	docker compose exec backend uv run python scripts/ingest_kb.py
 
 lint:
 	cd $(BACKEND) && uv run ruff check .

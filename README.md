@@ -140,7 +140,11 @@ cp .env.example .env
 docker compose up -d
 ```
 
-La primera vez tarda lo que tarden las descargas de los modelos de Ollama (varios GB); el volumen los conserva entre reinicios, así que arranques posteriores son instantáneos. Cuando `docker compose ps` muestre los 4 servicios `healthy`:
+La primera vez tarda lo que tarden las descargas de los modelos de Ollama (varios GB); el volumen los conserva entre reinicios, así que arranques posteriores son instantáneos. Cuando `docker compose ps` muestre los 4 servicios `healthy`, falta un paso: ingestar la base de conocimiento (RAG) — sin esto, `search_knowledge_base` responde `no_results` siempre.
+
+```bash
+docker compose exec backend uv run python scripts/ingest_kb.py
+```
 
 - Frontend: <http://localhost:5190>
 - Backend (OpenAPI): <http://localhost:8090/docs>
@@ -187,7 +191,7 @@ cd backend && uv run mypy                                          # typecheck
 cd backend && uv run pytest                                        # tests (191, excluye live/evalset)
 cd backend && uv run pytest tests/evalset -m evalset                # golden dataset contra el modelo real (~4 min)
 cd frontend && npm run typecheck && npm run build                  # frontend
-cd backend && uv run python scripts/ingest_kb.py                   # (re)ingesta de la KB
+docker compose exec backend uv run python scripts/ingest_kb.py     # (re)ingesta de la KB, dentro del contenedor
 docker compose up -d                                                # levanta todo, recarga en caliente
 ```
 
