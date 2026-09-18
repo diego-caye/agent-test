@@ -205,6 +205,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/feedback/{feedback_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Feedback */
+        delete: operations["delete_feedback_api_v1_feedback__feedback_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -235,6 +252,16 @@ export interface components {
         CreateSessionResponse: {
             /** Session Id */
             session_id: string;
+        };
+        /** DeclinedDecision */
+        DeclinedDecision: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "declined";
+            /** Motivo */
+            motivo: string;
         };
         /** FeedbackDto */
         FeedbackDto: {
@@ -284,6 +311,18 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** HandoffDecision */
+        HandoffDecision: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "handoff";
+            /** Ticket */
+            ticket: string;
+            /** Ya Existia */
+            ya_existia: boolean;
         };
         /** HandoffDto */
         HandoffDto: {
@@ -367,6 +406,8 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Decision */
+            decision?: (components["schemas"]["HandoffDecision"] | components["schemas"]["DeclinedDecision"]) | null;
         };
         /** ModelOption */
         ModelOption: {
@@ -776,9 +817,7 @@ export interface operations {
             query?: {
                 limit?: number;
             };
-            header?: {
-                authorization?: string | null;
-            };
+            header?: never;
             path?: never;
             cookie?: never;
         };
@@ -827,6 +866,35 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["FeedbackResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_feedback_api_v1_feedback__feedback_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                feedback_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

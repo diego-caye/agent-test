@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -16,10 +16,29 @@ class SessionSummary(BaseModel):
     etapa: str
 
 
+class HandoffDecision(BaseModel):
+    kind: Literal["handoff"] = "handoff"
+    ticket: str
+    ya_existia: bool
+
+
+class DeclinedDecision(BaseModel):
+    kind: Literal["declined"] = "declined"
+    motivo: str
+
+
+MessageDecision = Annotated[HandoffDecision | DeclinedDecision, Field(discriminator="kind")]
+
+
 class MessageDto(BaseModel):
     role: str
     content: str
     created_at: datetime
+    # Eco persistente de una confirmación HITL ya resuelta (spec 02, 03 §3):
+    # sin esto, recargar una conversación con handoff perdía el aviso de
+    # "derivado"/"ahora no" y quedaba como si el mensaje del agente nunca
+    # hubiera pasado por ahí.
+    decision: MessageDecision | None = None
 
 
 class LeadDto(BaseModel):
