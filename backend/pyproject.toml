@@ -1,0 +1,67 @@
+[project]
+name = "asesor"
+version = "0.1.0"
+description = "Asesor automotriz virtual - nucleo decisional sobre Google ADK"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.5",
+    "sqlalchemy[asyncio]>=2.0",
+    "asyncpg>=0.29",
+    "psycopg[binary]>=3.1",
+    "google-adk[extensions]==2.9.1",
+    "alembic>=1.20.0",
+    "opentelemetry-sdk>=1.29",
+    "opentelemetry-exporter-otlp-proto-http>=1.29",
+    "openinference-instrumentation-google-adk>=0.1.28",
+    "pgvector>=0.5.0",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.14",
+    "mypy>=1.14",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.25",
+    "pytest-cov>=6.0",
+    "httpx>=0.28",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/asesor"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src", "tests"]
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["google.adk.*", "pgvector.*"]
+ignore_missing_imports = true
+# ADK reexporta simbolos sin __all__ explicito (p. ej. StreamingMode vive en un
+# modulo privado y solo se expone via reexport).
+implicit_reexport = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-q --strict-markers -m 'not live and not evalset'"
+markers = [
+    "live: golpea un modelo real; excluido de CI",
+    "evalset: golden dataset de conversaciones contra un modelo real; excluido de CI (spec 09)",
+]

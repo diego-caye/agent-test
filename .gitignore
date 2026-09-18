@@ -26,3 +26,13 @@ Thumbs.db
 
 .idea/
 .vscode/
+
+# Skills de agentes instalados localmente (npx skills add google/agents-cli)
+.agents/
+.claude/skills/
+skills-lock.json
+
+# Enunciado del reto: nombra a la empresa del proceso de selección (regla de
+# confidencialidad, CLAUDE.md §5). Nunca debe entrar al historial.
+*.pdf
+

@@ -1,0 +1,116 @@
+from collections.abc import Sequence
+
+import pytest
+
+from asesor.application.knowledge_service import EmbeddingModelMismatchError, KnowledgeService
+from asesor.domain.enums import CategoriaKb
+from asesor.domain.knowledge import RetrievedChunk
+from asesor.infrastructure.embeddings.fake import FakeEmbeddings
+
+
+class StubRetriever:
+    def __init__(self, chunks: list[RetrievedChunk], model: str | None) -> None:
+        self.chunks = chunks
+        self.model = model
+        self.last_categoria: CategoriaKb | None = None
+
+    async def search(
+        self, embedding: Sequence[float], *, categoria: CategoriaKb | None, top_k: int
+    ) -> list[RetrievedChunk]:
+        self.last_categoria = categoria
+        return self.chunks[:top_k]
+
+    async def stored_embedding_model(self) -> str | None:
+        return self.model
+
+
+def chunk(chunk_id: str, score: float) -> RetrievedChunk:
+    return RetrievedChunk(
+        chunk_id=chunk_id,
+        title="t",
+        categoria=CategoriaKb.CARROCERIAS,
+        source="s.md",
+        content="c",
+        score=score,
+    )
+
+
+async def test_devuelve_vacio_si_el_mejor_score_no_alcanza_el_umbral() -> None:
+    retriever = StubRetriever([chunk("a", 0.40), chunk("b", 0.30)], "fake-embeddings")
+    service = KnowledgeService(FakeEmbeddings(), retriever, min_score=0.55)
+
+    assert await service.search("q", categoria=None, top_k=4) == []
+
+
+async def test_filtra_los_que_quedan_bajo_el_umbral() -> None:
+    retriever = StubRetriever([chunk("a", 0.80), chunk("b", 0.20)], "fake-embeddings")
+    service = KnowledgeService(FakeEmbeddings(), retriever, min_score=0.55)
+
+    result = await service.search("q", categoria=None, top_k=4)
+
+    assert [c.chunk_id for c in result] == ["a"]
+
+
+async def test_propaga_el_filtro_de_categoria() -> None:
+    retriever = StubRetriever([chunk("a", 0.90)], "fake-embeddings")
+    service = KnowledgeService(FakeEmbeddings(), retriever, min_score=0.5)
+
+    await service.search("q", categoria=CategoriaKb.MOTORIZACION, top_k=2)
+
+    assert retriever.last_categoria is CategoriaKb.MOTORIZACION
+
+
+async def test_verifica_que_el_modelo_de_embeddings_coincide() -> None:
+    service = KnowledgeService(
+        FakeEmbeddings(), StubRetriever([], "gemini-embedding-001"), min_score=0.5
+    )
+
+    with pytest.raises(EmbeddingModelMismatchError, match=r"re-?ing|ingerir"):
+        await service.verify_embedding_model()
+
+
+async def test_una_kb_vacia_no_bloquea_el_arranque() -> None:
+    service = KnowledgeService(FakeEmbeddings(), StubRetriever([], None), min_score=0.5)
+
+    await service.verify_embedding_model()
+
+
+async def test_modelo_coincidente_no_lanza() -> None:
+    service = KnowledgeService(
+        FakeEmbeddings(), StubRetriever([], "fake-embeddings"), min_score=0.5
+    )
+
+    await service.verify_embedding_model()
+
+
+class CategoriaAwareRetriever:
+    """Devuelve resultados solo cuando NO se filtra por categoría."""
+
+    def __init__(self) -> None:
+        self.categorias_pedidas: list[CategoriaKb | None] = []
+
+    async def search(
+        self, embedding: Sequence[float], *, categoria: CategoriaKb | None, top_k: int
+    ) -> list[RetrievedChunk]:
+        self.categorias_pedidas.append(categoria)
+        return [] if categoria is not None else [chunk("a", 0.80)]
+
+    async def stored_embedding_model(self) -> str | None:
+        return "fake-embeddings"
+
+
+async def test_reintenta_sin_filtro_si_la_categoria_no_da_resultados() -> None:
+    retriever = CategoriaAwareRetriever()
+    service = KnowledgeService(FakeEmbeddings(), retriever, min_score=0.5)
+
+    result = await service.search("q", categoria=CategoriaKb.SEGMENTOS, top_k=4)
+
+    assert [c.chunk_id for c in result] == ["a"]
+    assert retriever.categorias_pedidas == [CategoriaKb.SEGMENTOS, None]
+
+
+async def test_no_reintenta_si_ya_venia_sin_filtro() -> None:
+    retriever = StubRetriever([], "fake-embeddings")
+    service = KnowledgeService(FakeEmbeddings(), retriever, min_score=0.5)
+
+    assert await service.search("q", categoria=None, top_k=4) == []
