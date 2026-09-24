@@ -16,6 +16,7 @@ Migración de un workflow de n8n a un backend propio con **Google ADK 2.x + Fast
 - [Documentación](#documentación)
 - [Demo](#demo)
 - [Estado del proyecto](#estado-del-proyecto)
+- [Licencia](#licencia)
 
 ## Características
 
@@ -219,3 +220,7 @@ Video (5-7 min): _pendiente de grabar y enlazar._
 ## Estado del proyecto
 
 Fases F0–F9 del plan de construcción — detalle y hallazgos de cada una en [`PROGRESS.md`](PROGRESS.md). Reto técnico (AI Engineer) con entrega viernes 18-sep-2026.
+
+## Licencia
+
+[MIT](LICENSE).
